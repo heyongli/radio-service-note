@@ -80,3 +80,11 @@ SVG 结构: lxml 检查每层 `<g>` 子元素数与文本样本;
 渲染正确性: cairosvg 导 PNG 后, 在已知标签位置 crop±(90,60) + 4x
 上采样 OCR 回读(marks 的 L39/IC10、blocks 的 BPF、notes 的 not-located
 是基准回归点)。
+
+## v0.1.2: 字号分级与标签方位 (2026-09-10)
+
+- waypoint 条目新增 `fs`(字号覆盖)与 `lpos`(8方位: ul/ur/dl/dr/l/r/u/d,
+  自动计算偏移+text-anchor)。按器件尺寸分级: 大IC/连接器 30-38, 晶体管/滤波器
+  24-28, 小元件(R/C/D) 20-22, IC 引脚 18。
+- 经验: 标签优先放连线行进方向的侧后方; 基图有丝印文字处(base PDF 文本层)
+  避让; note 跟随主标签下方(0.62×fs)。

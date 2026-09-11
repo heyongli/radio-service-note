@@ -219,18 +219,40 @@ def main():
                                "fill": col if not dash else "none", "stroke": col,
                                "stroke-width": "2"})
             if lab:
-                tx = px[0] + (args.dot_r + 4) + e.get("ldx", 0)
-                ty = px[1] - (args.dot_r + 4) + e.get("ldy", 0)
-                t = sub("text", {"x": str(tx), "y": str(ty), "font-size": str(args.font_size),
+                fs = e.get("fs", args.font_size)
+                lpos = e.get("lpos")  # ul/ur/dl/dr/l/r/u/d 方位简写
+                ldx, ldy = e.get("ldx", 0), e.get("ldy", 0)
+                anch = "start"
+                rr = args.dot_r + 4
+                if lpos == "ul":
+                    anch, ldx, ldy = "end", -rr, -rr
+                elif lpos == "ur":
+                    anch, ldx, ldy = "start", rr, -rr
+                elif lpos == "dl":
+                    anch, ldx, ldy = "end", -rr, rr + fs * 0.25
+                elif lpos == "dr":
+                    anch, ldx, ldy = "start", rr, rr + fs * 0.25
+                elif lpos == "l":
+                    anch, ldx, ldy = "end", -rr, fs * 0.30
+                elif lpos == "r":
+                    anch, ldx, ldy = "start", rr, fs * 0.30
+                elif lpos == "u":
+                    anch, ldx, ldy = "middle", 0, -rr - fs * 0.25
+                elif lpos == "d":
+                    anch, ldx, ldy = "middle", 0, rr + fs * 0.85
+                tx = px[0] + rr + ldx
+                ty = px[1] - rr + ldy
+                t = sub("text", {"x": str(tx), "y": str(ty), "font-size": str(fs),
                                  "font-family": "sans-serif", "font-weight": "bold",
-                                 "stroke-width": str(args.font_size * 0.12),
+                                 "text-anchor": anch,
+                                 "stroke-width": str(fs * 0.12),
                                  "stroke": "#ffffff" if args.text_halo else "none",
                                  "paint-order": "stroke", "fill": col}, lab)
                 if e.get("note"):
-                    sub("text", {"x": str(tx), "y": str(ty + args.font_size * 0.85),
-                                 "font-size": str(args.font_size * 0.62),
+                    sub("text", {"x": str(tx), "y": str(ty + fs * 0.8),
+                                 "font-size": str(fs * 0.62),
                                  "font-family": "sans-serif", "fill": col,
-                                 "opacity": "0.9"}, e["note"])
+                                 "opacity": "0.9", "text-anchor": anch}, e["note"])
         counts[key] = n
 
     tree = etree.ElementTree(root)
