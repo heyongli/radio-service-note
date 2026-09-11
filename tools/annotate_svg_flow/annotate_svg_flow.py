@@ -94,6 +94,8 @@ def main():
                     help="waypoints px 所在 dpi (自动换算到底图空间)")
     ap.add_argument("--wpts", action="append", default=[],
                     help="waypoint JSON, 可多次; 'path[:layer]' 或 'path:layer=Inkscape标签'")
+    ap.add_argument("--only-layers", default=None,
+                    help="只渲染这些层(逗号分隔, 如 rx 或 rx,ctrl); 缺省全部")
     ap.add_argument("--layer-style", action="append", default=[],
                     help="层样式覆盖: 'rx:color=#xxxxxx,opacity=0.8'")
     ap.add_argument("--dot-r", type=float, default=7)
@@ -132,8 +134,8 @@ def main():
     _CUR[0] = defs
     for key, color, _lab in LAYER_DEFS:
         mk = sub("marker", {"id": f"arrow-{key}", "viewBox": "0 0 10 10", "refX": "8",
-                            "refY": "5", "markerWidth": "4", "markerWidth": "4",
-                            "markerHeight": "4", "orient": "auto-start-reverse"})
+                            "refY": "5", "markerWidth": "5", "markerHeight": "5",
+                            "orient": "auto-start-reverse"})
         sub("path", {"d": "M 0 0 L 10 5 L 0 10 z", "fill": color})
     _CUR[0] = root
 
@@ -162,12 +164,15 @@ def main():
         styles[kvs[0].strip()] = d
 
     # 收集 waypoints: 每条输入的条目可自带 layer 字段, 否则用 spec 的 hint
+    only = set(args.only_layers.split(",")) if args.only_layers else None
     buckets = {key: [] for key, _, _ in LAYER_DEFS}
     for spec in args.wpts:
         path, layer_hint, label_ov = parse_wpts_spec(spec)
         for e in load_wpts(path):
             layer = e.get("layer") or layer_hint or "notes"
             if layer not in buckets:
+                continue
+            if only and layer not in only:
                 continue
             if label_ov:
                 e = dict(e, label=e.get("label", ""))
@@ -202,7 +207,8 @@ def main():
                 pl = sub("polyline", {
                     "points": " ".join(f"{x:.1f},{y:.1f}" for x, y in pts),
                     "stroke-width": args.stroke_w, **common,
-                    "marker-end": f"url(#arrow-{key})"})
+                    "marker-end": f"url(#arrow-{key})",
+                    "marker-mid": f"url(#arrow-{key})"})
             elif kind == "rect":
                 sub("rect", {"x": str(px[0]), "y": str(px[1]),
                              "width": str(e.get("w", 200) * s), "height": str(e.get("h", 120) * s),
