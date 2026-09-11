@@ -70,20 +70,48 @@ pdftoppm -r 600 -png xx-top.pdf top600
 
 配方已固化为工具:`tools/pcb_designator_ocr/ocr_designators.py`
 (多阈值 psm11 + 字形聚类兜底 + 同位去重 + 误读归一 F1x→FIx/D1z→D12)。
-要点:
+要领(部分仍适用于 AI 管线, 保留):
 - **不要加字符白名单**:"IC10" 会因白名单吞掉 I 变成 "C10"/"CC)";
-  不加白名单 + 宽松正则后过滤(`\b[IJ]?C?[0-9]{1,3}\b` 等)。
-- 逐区域小图 OCR 比全图准(可按底色调阈值);AF 段等密集背景区 OCR 全噪声,
-  改 2.2x tile 人工视觉通读。
-- 字形聚类补漏(抓全图 OCR 漏的位号):numpy 掩码→`scipy.ndimage.label` 连通域→
-  尺寸过滤(字高 5-28px、宽 2-20px、长宽比<6)→`scipy.spatial.cKDTree` 20px 近邻
-  并查集聚类成文本框→逐框 4x crop 单词 OCR(--psm 7/8)。实测抓到 D12/FI1/L61/R209。
-- **每个 OCR 命中必须视觉双确认**:命中坐标 ±50px 做 5-8x crop 拼图签(黄字标 bbox),
-  读图转录,OCR+视觉都符才记"确认锚点",防幻觉。IC10/IC12/X2 即此流程定案。
-- 空间先验验证身份:按原理图链序约束搜索区(BNC 正下方找 LPF→L39/D12 命中,
-  FI2 旁找 FI1 命中),坐标合理才算数。
-- **实物照片不可用**:IC-2200H 实物照片 1861px 位号仅 8-10px,放大后仍不可靠转录;
-  PCB 图 3509px(300dpi)/7017px(600dpi) 是位号识别唯一可靠底图。
+  不加白名单 + 宽松正则后过滤。
+- 字形聚类找候选、逐区域小图 OCR、空间先验验证身份——这些思想已被
+  AI 管线继承(stage2 + 防幻觉闸)。
+- **每个锚点必须视觉双确认才可 confirmed**(AI 时代是 ±50px crop 拼图签
+  `--sheet` 人工过一遍; AI 双引擎 agree 可当预确认, 不是替代)。
+- 空间先验仍有效: BNC 正下方找 LPF, FI2 旁找 FI1, 坐标与链序相容才算数。
+- **实物照片不可用**(1861px 位号仅 8-10px): PCB 维修 PDF 渲染图
+  (300/600dpi) 是唯一可靠底图。
+- tesseract 管线保留为对照基线, 不再迭代。
+
+## 5A. AI-OCR 管线(2026-09-10 起, 替代 §5 作首选)
+
+**结论: 没有可直接读位号的 PCB 专用开源 AI**(PANEL-Net/Redraw/Atlas 查无
+此 repo; 现存原理图→网表项目内部都用通用 OCR)。CPU 首选 **RapidOCR
+(PP-OCRv4/v5/v6, onnxruntime)**。工具: `tools/ai_ocr_eval/ai_refdes_ocr.py`。
+
+实测要点(600dpi PCB top, 7017x4959):
+- **全页直接 OCR 会漏小字**(det 输入尺寸限制, rapidocr v3 Global.max_side_len
+  默认 2000); 两阶段才是正解: stage1 全页网格抓中大字(fast 预设 v4 约 17s) +
+  stage2 字形聚类候选→crop 4x LANCZOS 上采样+灰度对比度→读(全流程 ~9 分钟);
+- **crop+4x 上采样后各引擎几乎通读难例**(X2 0.92 / FI4 0.94 / D21 0.97 /
+  L60/L61/C256/R203 0.99)——AI rec 不是瓶颈, 全页 det 才是;
+- 引擎分工: **v4-mobile 全页小字检出最强**; v6 crop 内读数稳但爱插空格
+  ("I C 1 0", 匹配前先去空格); 双引擎同位一致(agree)≈自动预确认;
+- contour(内容轮廓+二分细分)模式: 用 cv2 传统工具(轮廓检测是成熟问题,
+  不需要 AI), 密集板面不如 grid(29s/58 refdes vs 17.5s/68), 稀疏页面才用;
+- 参数全部 CLI 可调, 已验证值与踩坑记在 `tools/ai_ocr_eval/README.md`;
+  **每次运行 JSON 归档**(版本/参数/日期), 用 compare_runs.py 对比调参,
+  `--reuse-stage1` 复用中间结果避免重复烧算力。
+- **对旧网表审计成果**: 24 锚点纠出 5 错(IC10/FI1/R221 坐标错、J4/J7 视图
+  错) + 1 存疑(IC12)。旧"视觉确认"错误率 ~20%, AI 双引擎+坐标一致性校验
+  应作为锚点强制复核步骤。
+
+### 原理图页(rxtxflow)颜色实测(校准 §4)
+- "红"实际是**深红/品红 RGB≈[236,4,142]**(b 通道可达 182!):
+  掩膜用 6 值区间 `150,255,0,110,0,200`, 不是简单 r>150,g<110,b<110;
+- 黄色在此页**几乎为零**(约 10px)——§4 的"黄=电源/控制"在 300dpi 渲染
+  上不成立, 电源/控制线未着色;
+- 绿(RX IF/AF)约 1.2%, 蓝(RX 前端)约 0.04%。TX 红路径遍布图面,
+  区域级 zone 无意义(bbox 覆盖 >30% 应丢弃), 待逐线读序(todo)。
 
 ## 6. 视图方向(mirror)判断
 
@@ -97,9 +125,26 @@ pdftoppm -r 600 -png xx-top.pdf top600
 - 产出分类放独立目录,**禁止混放**(含旧 `extract/`,已废弃删除):
   `render/`=PDF 渲染底图、`scan/`=读图窗口/图签、`nettable/`=网表 JSON
   (含 waypoints)、`annot/`=标注成品、`archive/old_extract/`=历史调试文件;
+- 新增目录约定(2026-09-10): `nettable/ai_ocr_runs/`=AI-OCR 运行归档(只增
+  不删)、`nettable/components_index.json`=元器件索引(枢纽, 必须保持新鲜)、
+  `annot/svg_runs/`=SVG 渲染归档;
 - 临时中间件放 `/tmp/opencode/`(600dpi 大图等),网表 JSON 里记录其路径。
 
-## 8. 任务推进建议(已完成部分)
+## 8. 标注与数据层(2026-09-10 新增)
+
+- **原理图/PCB 标注首选 SVG 分层**(`tools/annotate_svg_flow/`): 仿
+  `example/talkabout-bot.svg` 分层原则; 底图 base64 内嵌+图层锁定;
+  实线=确认/虚线=推断/not-located 进 notes 层。旧 raster 标注
+  (add_photo_wpts) 保留给照片场景。
+- **waypoints 从 components_index 生成**(`make_wpts_from_index.py`),
+  不再手写; 信号流跨图(原理图链序→PCB 落点)一律经
+  `nettable/components_index.json` 解析坐标(架构见 architecture.md)。
+- **nettable 数据规范**见 `projects/<机型>/nettable/SCHEMA.md`:
+  300dpi 统一坐标空间、provenance 必填、状态三态、revisions 留痕。
+- 中间结果常态化保存: AI 运行 JSON 归档 `nettable/ai_ocr_runs/`(校准
+  资产, 只在确认乱套时删); SVG 渲染归档 `annot/svg_runs/`。
+
+## 9. 任务推进建议(已完成部分)
 
 1. 先 `pdftotext` 全文 dump → 建立位号/信号名清单与坐标;
 2. `pdftocairo -svg` + 字形解析补齐描边文字;
