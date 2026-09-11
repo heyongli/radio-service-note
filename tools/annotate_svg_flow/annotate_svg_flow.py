@@ -3,15 +3,18 @@
 
 分层原则(从 example 学到):
   * 底图单独一层: 光栅渲染图 base64 内嵌(不外链, 单文件自包含), 图层锁定
-    (sodipodi:insensitive="true", Inkscape 里点不中/拖不动, 防误操作)
-  * 每个语义类一层 (inkscape:groupmode=layer + inkscape:label):
-    rx / tx / ctrl-power / blocks / marks / notes, 层级默认色, 可整体开关/隐藏
-  * 层内元素: rect(区域) + polyline+箭头(信号流) + text(标签) + 圆点(锚点)
+  * 每个语义类一层 (inkscape:groupmode=layer): rx / tx / ctrl / blocks / marks / notes
+  * 层内元素: rect(区域) + polyline(信号流, 每个到达点画箭头) + text(标签) + 圆点/via
   * 实线=已确认, 虚线=推断/not-located (agent.md 防臆造约定)
-  * base 之上按 rx → tx → ctrl → blocks → marks → notes 叠放
 
-工具规范(与 ai_refdes_ocr.py 一致): 全参数 CLI; 每次渲染归档 runs-dir
-(含 tool_version/date/params/script_sha1); --out 只是指向最新运行的副本.
+v0.2.0 视觉规则 (2026-09-10 用户反馈驱动):
+  * 线条/圆点 = 层色; 文字标签 = --label-color (默认深蓝 #0d47a1, 与线条区分)
+  * via=true 条目 (信号从/到背面) = 土黄 #B8860B: 焊盘环+孔符号, 线条文字同色
+  * 箭头 = 手绘三角 (每段终点+每个拐点), 不用 SVG marker (小图缩放后不可见)
+  * fs 按元器件封装大小在 wpts 数据里逐条给定 (大IC 30-38 / 中件 24-28 / 小件-pin 18-22)
+  * ldx/ldy = 在 lpos 方位基础上的**叠加**偏移 (v0.1.x bug: 直接覆盖)
+  * note 与 label 独立渲染 (空 label 也出 note); u/ul/ur 方位 note 放 label 上方
+  * rect 标签锚定矩形中心 ('d'=底边下方, 'u'=顶边上方)
 
 用法:
   python3 annotate_svg_flow.py --base render.png --wpts nettable/wpts_top.json:rx \
@@ -22,12 +25,13 @@ import base64
 import datetime
 import hashlib
 import json
+import math
 import os
 import shutil
 
 from lxml import etree
 
-TOOL_VERSION = "0.1.0"
+TOOL_VERSION = "0.2.1"
 SVG_NS = "http://www.w3.org/2000/svg"
 XLINK_NS = "http://www.w3.org/1999/xlink"
 INK_NS = "http://www.inkscape.org/namespaces/inkscape"
@@ -43,6 +47,7 @@ LAYER_DEFS = [
     ("marks", "#ff6f00", "Marks"),
     ("notes", "#9e9e9e", "Notes"),
 ]
+
 
 
 def _el(tag, attrs, text=None):
@@ -86,6 +91,27 @@ def load_wpts(path):
     return d
 
 
+def draw_arrow(x, y, x0, y0, size, color):
+    """在 (x,y) 画沿 (x0,y0)->(x,y) 方向的三角箭头."""
+    dx, dy = x - x0, y - y0
+    L = math.hypot(dx, dy)
+    if L < 1e-6:
+        return
+    ux, uy = dx / L, dy / L
+    bx, by = x - ux * size, y - uy * size
+    wx, wy = -uy * size * 0.45, ux * size * 0.45
+    sub("polygon", {"points": f"{x:.1f},{y:.1f} {bx + wx:.1f},{by + wy:.1f} "
+                    f"{bx - wx:.1f},{by - wy:.1f}", "fill": color})
+
+
+def draw_via(x, y, r, color, hole_stroke):
+    """PCB via 符号: 焊盘环 + 孔."""
+    sub("circle", {"cx": f"{x:.1f}", "cy": f"{y:.1f}", "r": f"{r * 1.6:.1f}",
+                   "fill": color, "stroke": "none"})
+    sub("circle", {"cx": f"{x:.1f}", "cy": f"{y:.1f}", "r": f"{r * 0.55:.1f}",
+                   "fill": "#ffffff", "stroke": color, "stroke-width": str(hole_stroke)})
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--base", required=True, help="底图 PNG")
@@ -98,11 +124,26 @@ def main():
                     help="只渲染这些层(逗号分隔, 如 rx 或 rx,ctrl); 缺省全部")
     ap.add_argument("--layer-style", action="append", default=[],
                     help="层样式覆盖: 'rx:color=#xxxxxx,opacity=0.8'")
+    ap.add_argument("--label-color", default="#0d47a1",
+                    help="文字标签颜色(与层色区分, 醒目); via 条目固定土黄")
     ap.add_argument("--dot-r", type=float, default=7)
-    ap.add_argument("--stroke-w", type=float, default=5)
-    ap.add_argument("--font-size", type=float, default=34)
+    ap.add_argument("--stroke-w", type=float, default=6)
+    ap.add_argument("--font-size", type=float, default=24,
+                    help="默认字号; 各条目用 fs 字段按封装大小覆盖")
     ap.add_argument("--dash-array", default="10 8")
-    ap.add_argument("--arrow-len", type=float, default=18)
+    ap.add_argument("--arrow-len", type=float, default=24)
+    ap.add_argument("--via-color", default="#b8860b",
+                    help="via/背面段土黄色")
+    ap.add_argument("--dot-stroke", type=float, default=2,
+                    help="锚点圆点描边宽")
+    ap.add_argument("--via-stroke", type=float, default=1.5,
+                    help="via 孔环描边宽")
+    ap.add_argument("--note-scale", type=float, default=0.62,
+                    help="note 字号 = fs × 此比例")
+    ap.add_argument("--halo-scale", type=float, default=0.14,
+                    help="文字白描边宽 = fs × 此比例")
+    ap.add_argument("--rect-fill-opacity", type=float, default=0.12,
+                    help="区域矩形填充不透明度")
     ap.add_argument("--text-halo", action="store_true", default=True,
                     help="文字白描边提高可读性")
     ap.add_argument("--no-text-halo", dest="text_halo", action="store_false")
@@ -129,16 +170,6 @@ def main():
         f" annotate_svg_flow v{TOOL_VERSION} {now} base={os.path.basename(args.base)} "))
 
     _CUR[0] = root
-    # defs: 箭头 marker (每色一个)
-    defs = sub("defs", {"id": "defs"})
-    _CUR[0] = defs
-    for key, color, _lab in LAYER_DEFS:
-        mk = sub("marker", {"id": f"arrow-{key}", "viewBox": "0 0 10 10", "refX": "8",
-                            "refY": "5", "markerWidth": "5", "markerHeight": "5",
-                            "orient": "auto-start-reverse"})
-        sub("path", {"d": "M 0 0 L 10 5 L 0 10 z", "fill": color})
-    _CUR[0] = root
-
     # base 层: base64 内嵌 + 锁定
     with open(args.base, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
@@ -146,10 +177,10 @@ def main():
                   f"{{{INK_NS}}}label": "Base",
                   f"{{{SOD_NS}}}insensitive": "true"})
     _CUR[0] = g
-    img = sub("image", {"x": "0", "y": "0", "width": str(W), "height": str(H),
-                        "preserveAspectRatio": "none",
-                        f"{{{XLINK_NS}}}href": f"data:image/png;base64,{b64}",
-                        "href": f"data:image/png;base64,{b64}"})
+    sub("image", {"x": "0", "y": "0", "width": str(W), "height": str(H),
+                  "preserveAspectRatio": "none",
+                  f"{{{XLINK_NS}}}href": f"data:image/png;base64,{b64}",
+                  "href": f"data:image/png;base64,{b64}"})
     _CUR[0] = root
 
     styles = {}
@@ -163,7 +194,7 @@ def main():
                 d[kv.split("=")[0].strip()] = kv.split("=")[1].strip()
         styles[kvs[0].strip()] = d
 
-    # 收集 waypoints: 每条输入的条目可自带 layer 字段, 否则用 spec 的 hint
+    # 收集 waypoints
     only = set(args.only_layers.split(",")) if args.only_layers else None
     buckets = {key: [] for key, _, _ in LAYER_DEFS}
     for spec in args.wpts:
@@ -174,8 +205,6 @@ def main():
                 continue
             if only and layer not in only:
                 continue
-            if label_ov:
-                e = dict(e, label=e.get("label", ""))
             buckets[layer].append(e)
 
     counts = {}
@@ -198,36 +227,66 @@ def main():
             px = [e["px"][0] * s, e["px"][1] * s]
             lab = e.get("label", "")
             dash = e.get("dash", False)
-            common = {"stroke": col, "fill": "none"}
+            kind = e.get("kind")
+            via = e.get("via", False)
+            # via=背面过孔(符号+土黄); tan=仅土黄(背面段, 不画符号); 其余=层色
+            tan_only = e.get("tan", False)
+            ecol = args.via_color if (via or tan_only) else col
+            tcol = args.via_color if (via or tan_only) else args.label_color
+            common = {"stroke": ecol, "fill": "none"}
             if dash:
                 common["stroke-dasharray"] = args.dash_array
-            kind = e.get("kind")
             if e.get("through"):
                 pts = [px] + [[p[0] * s, p[1] * s] for p in e["through"]]
-                pl = sub("polyline", {
+                sub("polyline", {
                     "points": " ".join(f"{x:.1f},{y:.1f}" for x, y in pts),
-                    "stroke-width": args.stroke_w, **common,
-                    "marker-end": f"url(#arrow-{key})",
-                    "marker-mid": f"url(#arrow-{key})"})
+                    "stroke-width": args.stroke_w, **common})
+                # 每个到达点(拐点+终点)画箭头; 短段跳过(终点必画)
+                for i in range(1, len(pts)):
+                    seg = math.hypot(pts[i][0] - pts[i - 1][0],
+                                     pts[i][1] - pts[i - 1][1])
+                    if seg >= args.arrow_len * 0.8 or i == len(pts) - 1:
+                        draw_arrow(pts[i][0], pts[i][1], pts[i - 1][0],
+                                   pts[i - 1][1], args.arrow_len, ecol)
             elif kind == "rect":
-                sub("rect", {"x": str(px[0]), "y": str(px[1]),
-                             "width": str(e.get("w", 200) * s), "height": str(e.get("h", 120) * s),
-                             "stroke-width": args.stroke_w, "fill": col, "fill-opacity": "0.12",
+                rw, rh = e.get("w", 200) * s, e.get("h", 120) * s
+                sub("rect", {"x": f"{px[0]:.1f}", "y": f"{px[1]:.1f}",
+                             "width": f"{rw:.1f}", "height": f"{rh:.1f}",
+                             "stroke-width": args.stroke_w, "fill": ecol,
+                             "fill-opacity": str(args.rect_fill_opacity),
                              **({"stroke-dasharray": args.dash_array} if dash else {})})
+                if via:  # 矩形中心画 via 符号 (整个区域在背面)
+                    draw_via(px[0] + rw / 2, px[1] + rh / 2, args.dot_r * 0.8,
+                             args.via_color, args.via_stroke)
             elif kind == "line" and e.get("to"):
-                sub("line", {"x1": str(px[0]), "y1": str(px[1]),
-                             "x2": str(e["to"][0] * s), "y2": str(e["to"][1] * s),
-                             "stroke-width": args.stroke_w,
-                             "marker-end": f"url(#arrow-{key})", **common})
-            # 点锚 + 标签(除纯 rect/line 外都画点; dot=False 只出文字)
-            if e.get("dot", True) and kind not in ("rect", "line", "text"):
-                sub("circle", {"cx": str(px[0]), "cy": str(px[1]), "r": str(args.dot_r),
-                               "fill": col if not dash else "none", "stroke": col,
-                               "stroke-width": "2"})
-            if lab:
+                tx2, ty2 = e["to"][0] * s, e["to"][1] * s
+                sub("line", {"x1": f"{px[0]:.1f}", "y1": f"{px[1]:.1f}",
+                             "x2": f"{tx2:.1f}", "y2": f"{ty2:.1f}",
+                             "stroke-width": args.stroke_w, **common})
+                draw_arrow(tx2, ty2, px[0], px[1], args.arrow_len, ecol)
+            # 锚点符号: via 条目=via 焊盘环; 普通条目=圆点 (dot=False 只出文字)
+            if via:
+                vx, vy = px
+                if e.get("via_at") == "end" and e.get("through"):
+                    vx, vy = e["through"][-1][0] * s, e["through"][-1][1] * s
+                    if not e.get("dot"):
+                        pass
+                    else:  # px 处仍是本面真实器件: 保留普通圆点
+                        sub("circle", {"cx": f"{px[0]:.1f}", "cy": f"{px[1]:.1f}",
+                                       "r": str(args.dot_r),
+                                       "fill": col if not dash else "none",
+                                       "stroke": col, "stroke-width": str(args.dot_stroke)})
+                draw_via(vx, vy, args.dot_r, args.via_color, args.via_stroke)
+            elif e.get("dot", True) and kind not in ("rect", "line", "text"):
+                sub("circle", {"cx": f"{px[0]:.1f}", "cy": f"{px[1]:.1f}",
+                               "r": str(args.dot_r),
+                               "fill": ecol if not dash else "none",
+                               "stroke": ecol, "stroke-width": str(args.dot_stroke)})
+            # 文字: label + note 独立渲染 (note 不依赖 label)
+            if lab or e.get("note"):
                 fs = e.get("fs", args.font_size)
-                lpos = e.get("lpos")  # ul/ur/dl/dr/l/r/u/d 方位简写
-                ldx, ldy = e.get("ldx", 0), e.get("ldy", 0)
+                lpos = e.get("lpos")
+                base_ldx, base_ldy = e.get("ldx", 0), e.get("ldy", 0)
                 anch = "start"
                 rr = args.dot_r + 4
                 if lpos == "ul":
@@ -246,19 +305,45 @@ def main():
                     anch, ldx, ldy = "middle", 0, -rr - fs * 0.25
                 elif lpos == "d":
                     anch, ldx, ldy = "middle", 0, rr + fs * 0.85
-                tx = px[0] + rr + ldx
-                ty = px[1] - rr + ldy
-                t = sub("text", {"x": str(tx), "y": str(ty), "font-size": str(fs),
+                else:
+                    ldx, ldy = 0, 0
+                ldx += base_ldx
+                ldy += base_ldy
+                # rect 标签锚定矩形中心; 其余锚定 px
+                if kind == "rect":
+                    cx = px[0] + e.get("w", 200) * s / 2
+                    if anch == "middle":
+                        tx = cx + ldx
+                    elif anch == "end":
+                        tx = cx - e.get("w", 200) * s / 2 - rr + ldx
+                    else:
+                        tx = cx + e.get("w", 200) * s / 2 + rr + ldx
+                    ty = (px[1] - rr + ldy) if lpos == "u" else \
+                         (px[1] + e.get("h", 120) * s + rr + fs * 0.6 + ldy)
+                else:
+                    tx = px[0] + rr + ldx
+                    ty = px[1] - rr + ldy
+                if lab:
+                    sub("text", {"x": f"{tx:.1f}", "y": f"{ty:.1f}",
+                                 "font-size": str(fs),
                                  "font-family": "sans-serif", "font-weight": "bold",
                                  "text-anchor": anch,
-                                 "stroke-width": str(fs * 0.12),
+                                 "stroke-width": str(fs * args.halo_scale),
                                  "stroke": "#ffffff" if args.text_halo else "none",
-                                 "paint-order": "stroke", "fill": col}, lab)
+                                 "paint-order": "stroke", "fill": tcol}, lab)
                 if e.get("note"):
-                    sub("text", {"x": str(tx), "y": str(ty + fs * 0.8),
-                                 "font-size": str(fs * 0.62),
-                                 "font-family": "sans-serif", "fill": col,
-                                 "opacity": "0.9", "text-anchor": anch}, e["note"])
+                    nfs = fs * args.note_scale
+                    if not lab:  # 无 label: note 就在本位
+                        ny = ty
+                    elif lpos in ("u", "ul", "ur"):
+                        ny = ty - fs * 0.95
+                    else:
+                        ny = ty + fs * 1.02
+                    sub("text", {"x": f"{tx:.1f}", "y": f"{ny:.1f}",
+                                 "font-size": f"{nfs:.1f}",
+                                 "font-family": "sans-serif",
+                                 "fill": tcol, "opacity": "0.95",
+                                 "text-anchor": anch}, e["note"])
         counts[key] = n
 
     tree = etree.ElementTree(root)

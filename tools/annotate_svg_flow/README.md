@@ -96,3 +96,29 @@ SVG 结构: lxml 检查每层 `<g>` 子元素数与文本样本;
 - polyline 加 `marker-mid`: 弯道处也有方向箭头(cairosvg 已验证支持)。
 - 布线规范: 横平竖直优先; 交叉时绕行(如本例 TX 从上方进 D12、
   ctrl 线绕行西侧), 交汇于同一器件(如 ANT-SW)不算交叉。
+
+## v0.2.1: 视觉规则重做 + 样式全参数化 (2026-09-10, 用户反馈驱动)
+
+用户反馈四条 → 实现方式:
+1. **"箭头看不见/不显著"**: marker 箭头(5×stroke≈20px)在大图上太隐 →
+   改**手绘三角** polygon(`draw_arrow`), 每个拐点+终点各一枚, `--arrow-len 24`;
+   层透明度默认 0.95, 本项目出图用 `--layer-style rx:opacity=0.9`。
+2. **"从/到背面 → 土黄 via 形状"**: 条目 `via: true` → 焊盘环+孔符号
+   (颜色 `--via-color` 默认 #b8860b); `tan: true` 仅变色不画符号
+   (背面段); `via_at: "end"` = 符号画在 polyline 终点(px 处保留真实器件圆点)。
+   语义: top 视图上的 bot 侧 ghost 器件整体土黄; bot 视图上本面器件保持
+   层色, 仅跨面过孔画土黄符号。
+3. **"字体别用绿色"**: 文字统一 `--label-color` 深蓝 #0d47a1(与线条色区分,
+   醒目); via/tan 条目文字仍土黄以标记背面。fs 逐条按封装大小在数据里给定。
+4. **"字体会重叠"**: 三处修复 —
+   - 渲染器: `ldx/ldy` 改为在 lpos 方位上**叠加**(v0.1.x 是覆盖, IC4 标签
+     偏移失效的根因); note 与 label 独立渲染(v0.1.x 空 label 条目的
+     note 被静默丢弃); u/ul/ur 方位 note 移到 label 上方; rect 标签锚定
+     矩形中心('d' 底边下方/'u' 顶边上方)。
+   - 校验: 解析产物 SVG + PIL DejaVuSans-Bold 实测字宽 → bbox 相交检测
+     (估宽 0.58×fs 偏窄, 实测更准), 修复至 0 重叠再出图。
+5. **"配色/粗细不许硬编码"**: 全部样式常数入 CLI —
+   `--label-color --via-color --dot-stroke --via-stroke --note-scale
+   --halo-scale --rect-fill-opacity`(v0.2.1); 原有 `--stroke-w --dot-r
+   --arrow-len --font-size --dash-array --layer-style` 不变。
+   回归: 默认值渲染与旧版像素一致(抽 via 区 403/343px 不变)。
