@@ -15,6 +15,7 @@
 | `annotate_svg_flow/route_on_traces.py` | bot 视图铜箔线稿 Dijkstra 路由(顺走线 polyline, 失败回退正交) | ✅ 可用 v0.1 |
 | `annotate_svg_flow/make_wpts_from_index.py` | 从 components_index 生成 wpts | ✅ 可用 |
 | `components_index/build_index.py` | 元器件索引(跨视图坐标枢纽) | ✅ 可用 v0.1 |
+| `ic_package_detect/detect_ic.py` | IC 封装定位三法: pin-silk(引脚号丝印→全引脚)/body(暗矩形)/contour | ✅ 可用 v0.1 |
 | `pcb_designator_ocr/ocr_designators.py` | 旧 tesseract 多阈值管线 | ⚠️ 备留(被 ai_refdes_ocr 取代) |
 | `annotate_rx_flow/add_photo_wpts.py` | 照片位级 waypoint 标注(raster) | ✅ 保留 |
 | `annotate_rx_flow/annotate_rx_flow.py` | 旧块级标注(raster) | ⚠️ 备留 |
