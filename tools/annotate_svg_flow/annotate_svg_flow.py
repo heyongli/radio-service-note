@@ -31,7 +31,7 @@ import shutil
 
 from lxml import etree
 
-TOOL_VERSION = "0.2.1"
+TOOL_VERSION = "0.2.2"
 SVG_NS = "http://www.w3.org/2000/svg"
 XLINK_NS = "http://www.w3.org/1999/xlink"
 INK_NS = "http://www.inkscape.org/namespaces/inkscape"
@@ -324,13 +324,17 @@ def main():
                     tx = px[0] + rr + ldx
                     ty = px[1] - rr + ldy
                 if lab:
-                    sub("text", {"x": f"{tx:.1f}", "y": f"{ty:.1f}",
-                                 "font-size": str(fs),
-                                 "font-family": "sans-serif", "font-weight": "bold",
-                                 "text-anchor": anch,
-                                 "stroke-width": str(fs * args.halo_scale),
-                                 "stroke": "#ffffff" if args.text_halo else "none",
-                                 "paint-order": "stroke", "fill": tcol}, lab)
+                    # 两遍绘制: 白垫底层 + 彩色顶层 (cairosvg 不支持 paint-order,
+                    # 单遍 stroke 会盖掉 fill → PNG 里字被白描边啃成残影)
+                    attrs = {"x": f"{tx:.1f}", "y": f"{ty:.1f}",
+                             "font-size": str(fs),
+                             "font-family": "sans-serif", "font-weight": "bold",
+                             "text-anchor": anch}
+                    if args.text_halo:
+                        sub("text", {**attrs,
+                                     "fill": "#ffffff", "stroke": "#ffffff",
+                                     "stroke-width": str(fs * args.halo_scale * 2)}, lab)
+                    sub("text", {**attrs, "fill": tcol}, lab)
                 if e.get("note"):
                     nfs = fs * args.note_scale
                     if not lab:  # 无 label: note 就在本位

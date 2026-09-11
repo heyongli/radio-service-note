@@ -27,3 +27,5 @@
   (agent 见 architecture.md §6)
 * nettable 必含: confirmed_anchors(坐标+置信来源), not_located 清单,
   chain_order_schematic, artifacts 索引, revisions 留痕
+* **git 提交纪律 (2026-09-10 用户指示)**: 不要自动 commit;
+  工作完成后停下汇报, 等用户明确要求 commit 才执行。
