@@ -11,7 +11,9 @@
 | `ai_ocr_eval/eval_refdes.py` | 单配置 vs 锚点召回评估 | ✅ 可用 |
 | `ai_ocr_eval/probe_anchor.py` | 单锚点多变体×多引擎诊断探针 | ✅ 可用 |
 | `ai_ocr_eval/compare_runs.py` | 运行间差异对比(调参/校准/回归) | ✅ 可用 |
-| `annotate_svg_flow/annotate_svg_flow.py` | 分层 SVG 标注(base64 内嵌+底图锁定, cairosvg 导 PNG) | ✅ 可用 v0.1 |
+| `annotate_svg_flow/annotate_svg_flow.py` | 分层 SVG 标注(base64 内嵌+底图锁定, cairosvg 导 PNG; ldx/ldy 标签偏移) | ✅ 可用 v0.1.1 |
+| `annotate_svg_flow/route_on_traces.py` | bot 视图铜箔线稿 Dijkstra 路由(顺走线 polyline, 失败回退正交) | ✅ 可用 v0.1 |
+| `annotate_svg_flow/make_wpts_from_index.py` | 从 components_index 生成 wpts | ✅ 可用 |
 | `components_index/build_index.py` | 元器件索引(跨视图坐标枢纽) | ✅ 可用 v0.1 |
 | `pcb_designator_ocr/ocr_designators.py` | 旧 tesseract 多阈值管线 | ⚠️ 备留(被 ai_refdes_ocr 取代) |
 | `annotate_rx_flow/add_photo_wpts.py` | 照片位级 waypoint 标注(raster) | ✅ 保留 |

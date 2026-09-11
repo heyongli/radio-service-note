@@ -35,24 +35,25 @@
 
 ## 数据补全 (AI-OCR 管线已就位, 待批量跑)
 
-- [ ] **bot 视图整页 AI OCR 扫描**: 当前只有 top 完整跑过; J4/J7/C288/C298/
-      R108/SP 已有探针定位。跑完把 components_index 的 pcb_bot 视图补齐。
-- [ ] **FI1/FI3/FI4 原理图坐标入库**: sch_components_raw 缺 FI 键(原理图上
-      可能写作 F1/FL-xxx 或矢量字形读不到), 用 probe_anchor 思路在
-      rxtx300 渲染上定位后补 sch_components_raw。
-- [ ] **IC12 位号人工复核**: 多引擎×8 预处理变体均不可读, 需人工放大图签。
-- [ ] **TX 链条序读数入库**: chain_order_schematic 只有 RX; TX(红)链从
-      原理图红区段读序(MIC→VCO→DRV→PA→LPF→ANT), 方法同 RX。
-- [ ] **控制信号层逐线标注**: 目前 ctrl 层只有色块区域级; 逐线(PTT/SQ/DC)
-      需要 schematic 连线追踪。
+- [x] **bot 视图整页 AI OCR 扫描** (2026-09-10 完成: bot-full 运行, Q16/Q19/Q17/
+      Q26/Q39/IC6/Q4/IC1 等落位; 镜像方向修正为 X 镜像)
+- [x] **RX/TX/AF 链序完整恢复** (2026-09-10: block 图文本层+原理图文本层交叉,
+      IC10 角色修正为 PWR-AMP, chain_order 入 top_pcb.json)
+- [x] **IC4 引脚级坐标** (bot PDF 引脚号丝印 → 16 引脚全坐标入表)
+- [ ] **Q35/Q27/Q2/D9-D13/D18/L45/L52/IC5/X1 定位**: 标签在两视图均不可读,
+      下一步: 高倍局部多预处理变体探针 或 对照丝印图放大镜人工读图签
+- [ ] **IC9/IC12 精确坐标**: 已有强推断区(IC9: R125/C188/C192 环; IC12: 8pin+Q37/38),
+      待人工图签确认转 confirmed
+- [ ] **TX 链条序读数入库**: 已从 block+原理图恢复(见 top_pcb.json chain_order_tx),
+      待 PCB 侧 Q35 定位后补全 waypoint
 
 ## 标注与工具
 
-- [ ] **重出 top_pcb_rx 标注**: 旧 annot PNG 的 IC10/FI1 waypoint 用了错
-      坐标(stale_artifacts 已记录); 用 annotate_svg_flow + 修正后 wpts 重出
-      (SVG+PNG), 并给 PCB top/bot 视图也出分层 SVG。
-- [ ] **wpts 生成器**: 从 components_index + chain_order 自动生成 wpts_*.json
-      (现在手工写), 含"缺口段虚线+not-located"自动处理。
+- [x] **重出 top/bot PCB 标注** (2026-09-10: top/bot_pcb_flow_v2 分层 SVG+PNG,
+      opacity 0.6+箭头+IC4 引脚级+bot 铜箔路由; 旧 raster 标记 stale)
+- [x] **bot 铜箔走线路由器** (2026-09-10: route_on_traces.py, Dijkstra 沿铜箔线稿)
+- [ ] **wpts 生成器升级**: 现在 wpts_*_v2 是人工整理的链文件(引脚级+跨视图 ghost
+      超出 components_index 0.1 表达力); 待 index 升 0.2(package/pins)后回归生成器
 - [ ] **图签工具**: ai_refdes_ocr --sheet 产出的拼图签做成可选大图(带索引
       编号), 方便人工逐格勾选回写 status (ocr_hit→confirmed)。
 

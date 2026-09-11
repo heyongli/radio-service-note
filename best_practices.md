@@ -113,11 +113,36 @@ pdftoppm -r 600 -png xx-top.pdf top600
 - 绿(RX IF/AF)约 1.2%, 蓝(RX 前端)约 0.04%。TX 红路径遍布图面,
   区域级 zone 无意义(bbox 覆盖 >30% 应丢弃), 待逐线读序(todo)。
 
-## 6. 视图方向(mirror)判断
+## 5B. Block 图(IC-2200H-block.pdf)——流程恢复首选源 (2026-09-10)
 
-- top 视图(9-2):前缘在页底 —— J11 "to the LOGIC unit J3" 标注在下中;
-- bot 视图(9-4):**垂直镜像** —— DATA/SP(前缘件)标注出现在页顶;
-- 判断方法:用连接器标注在两个视图中的页边位置互推,不要想当然假设同向。
+- **block 图有真文本层**(Helvetica Type1C, 526 词, pdftotext 直读)——与 rxtxflow 的
+  描边字形不同, 拓扑恢复应从它入手; bbox 坐标已含 /Rotate 90, 直接对齐横版 300dpi 渲染。
+- 块间箭头是矢量线, 文本层读不到; 需配合原理图文本层(pdftotext -bbox)交叉确认链序。
+- **教训: 手读零件角色不可信**——IC10 "S-AV36" 曾被当成前端 ATT, 实为 PWR-AMP 末级
+  (block 图 PWR AMP 框内; VGG 引脚 TX:6.7V/RX:0V 栅偏佐证); RX 前端 ATT 实为 D18
+  PIN 二极管+SQLATT。角色认定一律回到 block 图框内标注。
+
+## 5C. PCB 视图的 IC 引脚号丝印 = 免费的地标 (2026-09-10)
+
+- top/bot PDF 文本层含引脚号标注(如 bot 的 "1/16/8/9"、"1/24/12/13"): 直接给出
+  IC 本体位置+方向+引脚间距, 是引脚级 waypoint 的数据源(例: IC4 TA31136FN
+  bot(940-1040,1680-1770) 16 引脚坐标全由此+内插得出)。
+- IC10 的教训同 5B。另: bot 面大 IC(IC4/IC1 PLL/IC6)与 top 面伴生 IC 背靠背
+  (IC11top/IC6bot), 定位一枚后按功能环找另一枚。
+
+
+
+## 6. 视图方向(mirror)判断 (2026-09-10 修正)
+
+- **bot 视图(9-4)是 top 视图的 X 镜像(左右翻转): top_equiv_x = 3509 - bot_x, y 不变**(300dpi)
+- 证据(10项功能聚类一致性, 详见 top_pcb.json view_mapping):
+  Q16+D29(IF-AMP) bot→top-equiv 恰在 FI3/FI4 与 FI1/FI2 之间的 IC4 旁;
+  Q26/Q39/IC6(APC) bot→top-equiv 与 IC11(top) 背靠背; Q28/IC7 bot→top-equiv 落 DC power 区;
+  Q19 bot→top-equiv 在 BPF 条带与 FI4 之间; REF-OSC Q4(bot) 紧邻 24pin PLL。
+- 判断方法: 用"功能伴生部件"(IF放大挨滤波器、APC挨功放、稳压挨电源入口)验证,
+  不要只看连接器页边位置(旧结论"垂直镜像"即由此误判, 已废弃)。
+- 板框两视图尺寸一致(2043x1622 vs 2040x1621 @300dpi); top 视图 y>2016 的 J11/J3
+  是画在板外的独立附图条带, 勿计入板框。
 
 ## 7. 中间文件与脚本管理(项目约定)
 

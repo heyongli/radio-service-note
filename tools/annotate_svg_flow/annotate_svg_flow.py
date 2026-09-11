@@ -219,18 +219,18 @@ def main():
                                "fill": col if not dash else "none", "stroke": col,
                                "stroke-width": "2"})
             if lab:
-                tx = px[0] + (args.dot_r + 4)
-                ty = px[1] - (args.dot_r + 4)
+                tx = px[0] + (args.dot_r + 4) + e.get("ldx", 0)
+                ty = px[1] - (args.dot_r + 4) + e.get("ldy", 0)
                 t = sub("text", {"x": str(tx), "y": str(ty), "font-size": str(args.font_size),
                                  "font-family": "sans-serif", "font-weight": "bold",
                                  "stroke-width": str(args.font_size * 0.12),
                                  "stroke": "#ffffff" if args.text_halo else "none",
                                  "paint-order": "stroke", "fill": col}, lab)
                 if e.get("note"):
-                    sub("text", {"x": str(tx), "y": str(ty + args.font_size * 0.9),
-                                 "font-size": str(args.font_size * 0.7),
+                    sub("text", {"x": str(tx), "y": str(ty + args.font_size * 0.85),
+                                 "font-size": str(args.font_size * 0.62),
                                  "font-family": "sans-serif", "fill": col,
-                                 "opacity": "0.85"}, f"({e['note']})" if not dash else e["note"])
+                                 "opacity": "0.9"}, e["note"])
         counts[key] = n
 
     tree = etree.ElementTree(root)
