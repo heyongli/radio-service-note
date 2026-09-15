@@ -22,12 +22,16 @@ Stage 2  候补读: 灰度双极性掩码→连通域→尺寸过滤→cKDTree �
 """
 import argparse
 import datetime
+import functools
 import hashlib
 import json
+import multiprocessing
 import os
 import re
 import shutil
+import signal
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -36,8 +40,97 @@ from PIL import Image, ImageDraw, ImageOps
 from scipy import ndimage
 from scipy.spatial import cKDTree
 
-TOOL_VERSION = "0.2.0"
+TOOL_VERSION = "0.3.0"
 REFDES_RE = re.compile(r"^[A-Z]{1,3}[0-9]{1,4}[A-Z]?$")
+
+_ABORT = False
+
+
+def _sigint(sig, frame):
+    global _ABORT
+    _ABORT = True
+
+
+class Progress:
+    """每个任务块完成即报告进度 + 定期落盘中间结果 (可 --reuse-* 续跑)."""
+
+    def __init__(self, phase, stage, total, cp_path, out_dpi, img_dpi, cp_every=120):
+        self.phase = phase
+        self.stage = stage
+        self.total = total
+        self.cp_path = cp_path
+        self.out_dpi = out_dpi
+        self.img_dpi = img_dpi
+        self.cp_every = cp_every
+        self.t0 = time.perf_counter()
+        self.last_cp = self.t0
+        self.last_line = self.t0
+        self.n = 0
+        self.hits = []
+        self.done_tiles = []
+
+    def _line(self, hits):
+        el = time.perf_counter() - self.t0
+        per = el / max(1, self.n)
+        eta = per * max(0, self.total - self.n)
+        pct = 100.0 * self.n / max(1, self.total)
+        return (f"[{self.phase}] {self.n}/{self.total} ({pct:4.1f}%) "
+                f"elapsed {el:5.0f}s ETA {eta:5.0f}s tile-avg {per:4.1f}s "
+                f"hits={len(hits)}")
+
+    def tick(self, hits, tile_idx=None):
+        self.n += 1
+        if tile_idx is not None:
+            self.done_tiles.append(tile_idx)
+        self.hits = hits
+        line = self._line(hits)
+        if sys.stderr.isatty():
+            sys.stderr.write("\r" + line + "    ")
+            sys.stderr.flush()
+        elif time.perf_counter() - self.last_line > 5:
+            self.last_line = time.perf_counter()
+            sys.stderr.write(line + "\n")
+            sys.stderr.flush()
+        now = time.perf_counter()
+        if _ABORT:
+            self.save_hits(hits)
+            sys.stderr.write("\n[interrupted] checkpoint saved\n")
+            sys.stderr.flush()
+            sys.exit(130)
+        if self.cp_path and (now - self.last_cp) >= self.cp_every:
+            self.last_cp = now
+            self.save_hits(hits)
+
+    def save_hits(self, hits):
+        if not self.cp_path:
+            return
+        key = f"raw_stage{self.stage}"
+        cp = {"run_save": True, "phase": self.phase, "stage": self.stage,
+              "created": datetime.datetime.now().isoformat(timespec="seconds"),
+              "params": {"out_dpi": self.out_dpi, "img_dpi": self.img_dpi},
+              key: hits,
+              "_checkpoint_n": self.n, "_checkpoint_total": self.total,
+              "_done_tiles": sorted(set(self.done_tiles))}
+        os.makedirs(os.path.dirname(self.cp_path) or ".", exist_ok=True)
+        tmp = self.cp_path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(cp, f, ensure_ascii=False, indent=1)
+        os.replace(tmp, self.cp_path)
+        sys.stderr.write(f"\n[checkpoint] stage{self.stage} n={len(hits)} "
+                         f"{self.n}/{self.total} -> {self.cp_path}\n")
+        sys.stderr.flush()
+
+    def done(self, hits):
+        self._line(hits)
+        if sys.stderr.isatty():
+            sys.stderr.write("\r" + self._line(hits) + "\n")
+        else:
+            sys.stderr.write(self._line(hits) + "\n")
+        sys.stderr.flush()
+        self.save_hits(hits)
+
+    def every(self):
+        return self.cp_every
 
 
 def _versions():
@@ -62,23 +155,48 @@ def _versions():
     return {k: x for k, x in v.items() if x}
 
 
-def make_engine(name, max_side_len=None):
-    """引擎注册表: v4 / v5en / v6 / tess — 返回 (引擎对象, 描述)."""
+def _patch_dml():
+    """Windows 原生运行: monkey-patch rapidocr 强制 DirectML (rapidocr use_dml bug)."""
+    import sys
+    if sys.platform != "win32":
+        return False
+    try:
+        from dml_helper import enable_dml
+    except ImportError:
+        try:
+            from ai_ocr_eval.dml_helper import enable_dml
+        except ImportError:
+            raise SystemExit("DirectML 需要 dml_helper.py; 请与 ai_refdes_ocr.py 同目录")
+    return enable_dml()
+
+
+def make_engine(name, max_side_len=None, use_dml=False):
+    """引擎注册表: v4 / v5en / v6 / tess — 返回 (引擎对象, 描述).
+    use_dml=True 时(Windows 原生运行) 强制 rapidocr v5/v6 走 DirectML.
+    """
+    if use_dml:
+        _patch_dml()
     if name == "v4":
         from rapidocr_onnxruntime import RapidOCR as R4
 
         return R4(), "rapidocr-onnxruntime/PP-OCRv4-mobile"
-    if name in ("v6", "v5en"):
+    if name in ("v6", "v5en", "v5s"):
         from rapidocr import RapidOCR, OCRVersion, ModelType
 
         params = {"Cls.ocr_version": OCRVersion.PPOCRV5}
         if name == "v6":
             params.update({"Det.ocr_version": OCRVersion.PPOCRV6, "Rec.ocr_version": OCRVersion.PPOCRV6})
             desc = "rapidocr/PP-OCRv6-small"
-        else:
+        elif name == "v5en":
             params.update({"Det.ocr_version": OCRVersion.PPOCRV5, "Rec.ocr_version": OCRVersion.PPOCRV5,
                            "Rec.model_type": ModelType.EN})
             desc = "rapidocr/PP-OCRv5-en"
+        else:
+            params.update({"Det.ocr_version": OCRVersion.PPOCRV5,
+                           "Det.model_type": ModelType.SERVER,
+                           "Rec.ocr_version": OCRVersion.PPOCRV5,
+                           "Rec.model_type": ModelType.SERVER})
+            desc = "rapidocr/PP-OCRv5-server"
         if max_side_len:
             params["Global.max_side_len"] = int(max_side_len)
         return RapidOCR(params=params), desc
@@ -122,34 +240,72 @@ def unrot(rx, ry, k, W, H):
     return ry, H - 1 - rx
 
 
-def stage1_grid(engs, arr, scale, P):
+def _grid_tile_init(_arr, _eng, _up):
+    """子进程初始化: 传递整图共享引用 + 引擎(仅 fork 时有效)."""
+    global _T_ARR, _T_ENG, _T_UP
+    _T_ARR, _T_ENG, _T_UP = _arr, _eng, _up
+
+
+def _grid_tile_work(task):
+    """单 tile 所有旋转/引擎扫描, 返回该 tile 的 hits (px 为 out-dpi 空间)."""
+    global _T_ARR, _T_ENG, _T_UP
+    y, x, tile, overlap, rots, scale = task
+    H, W = _T_ARR.shape[:2]
+    up = _T_UP
+    arr = _T_ARR
+    engs = _T_ENG
+    hits = []
+    sub = arr[y:y + tile, x:x + tile]
+    th, tw = sub.shape[:2]
+    if up != 1.0:
+        sub = np.asarray(Image.fromarray(sub).resize(
+            (int(tw * up), int(th * up)), Image.LANCZOS))
+    for k in [({0: 0, 90: 1, 180: 2, 270: 3}[r]) for r in rots]:
+        t = np.rot90(sub, k) if k else sub
+        for ename, (eng, _) in engs.items():
+            for box, txt, sc in read_engine(eng, ename, t):
+                cx, cy = box[:, 0].mean(), box[:, 1].mean()
+                if up != 1.0:
+                    cx, cy = cx / up, cy / up
+                if k:
+                    cx, cy = unrot(cx, cy, k, tw, th)
+                hits.append({
+                    "text": txt, "conf": round(sc, 3), "engine": ename, "stage": 1,
+                    "px": [round((x + cx) * scale), round((y + cy) * scale)],
+                    "box": [[round((x + px / up) * scale), round((y + py / up) * scale)]
+                            for px, py in box] if up != 1.0 else
+                          [[round((x + px) * scale), round((y + py) * scale)] for px, py in box],
+                })
+    return hits
+
+
+def stage1_grid(engs, arr, scale, P, report=None, resume_done=None):
     hits = []
     H, W = arr.shape[:2]
     up = P.stage1_upscale
     rots = [int(r) % 360 for r in P.stage1_rots.split(",") if r.strip() != ""]
+    jobs = max(1, P.jobs)
+    tiles = []
     for y in range(0, H, P.tile - P.overlap):
         for x in range(0, W, P.tile - P.overlap):
-            sub = arr[y:y + P.tile, x:x + P.tile]
-            th, tw = sub.shape[:2]
-            if up != 1.0:
-                sub = np.asarray(Image.fromarray(sub).resize(
-                    (int(tw * up), int(th * up)), Image.LANCZOS))
-            for k in [({0: 0, 90: 1, 180: 2, 270: 3}[r]) for r in rots]:
-                t = np.rot90(sub, k) if k else sub
-                for ename, (eng, _) in engs.items():
-                    for box, txt, sc in read_engine(eng, ename, t):
-                        cx, cy = box[:, 0].mean(), box[:, 1].mean()
-                        if up != 1.0:
-                            cx, cy = cx / up, cy / up
-                        if k:
-                            cx, cy = unrot(cx, cy, k, tw, th)
-                        hits.append({
-                            "text": txt, "conf": round(sc, 3), "engine": ename, "stage": 1,
-                            "px": [round((x + cx) * scale), round((y + cy) * scale)],
-                            "box": [[round((x + px / up) * scale), round((y + py / up) * scale)]
-                                    for px, py in box] if up != 1.0 else
-                                  [[round((x + px) * scale), round((y + py) * scale)] for px, py in box],
-                        })
+            tiles.append((y, x))
+    resume_done = resume_done or set()
+    todo_idx = [i for i in range(len(tiles)) if i not in resume_done]
+    if jobs == 1:
+        _grid_tile_init(arr, engs, up)  # 串行也初始化全局(供 _grid_tile_work 读)
+        for i, ti in enumerate(todo_idx):
+            y, x = tiles[ti]
+            if report:
+                report(i, len(tiles), hits, ti)
+            hits += _grid_tile_work((y, x, P.tile, P.overlap, rots, scale))
+        return hits
+    init = functools.partial(_grid_tile_init, arr, engs, up)
+    tasks = [(tiles[ti][0], tiles[ti][1], P.tile, P.overlap, rots, scale) for ti in todo_idx]
+    with multiprocessing.Pool(jobs, initializer=init) as pool:
+        for i, part in enumerate(pool.imap_unordered(_grid_tile_work, tasks)):
+            if report:
+                report(i, len(tiles), hits, todo_idx[i])
+            hits += part
     return hits
 
 
@@ -195,13 +351,15 @@ def content_regions(arr, P):
     return tight
 
 
-def stage1_contour(engs, arr, scale, P):
+def stage1_contour(engs, arr, scale, P, report=None):
     hits = []
     H, W = arr.shape[:2]
     up = P.stage1_upscale
     rots = [int(r) % 360 for r in P.stage1_rots.split(",") if r.strip() != ""]
     regions = content_regions(arr, P)
-    for x0, y0, x1, y1 in regions:
+    for i, (x0, y0, x1, y1) in enumerate(regions):
+        if report:
+            report(i, len(regions), hits)
         x0, y0 = max(0, x0 - P.region_grow), max(0, y0 - P.region_grow)
         x1, y1 = min(W, x1 + P.region_grow), min(H, y1 + P.region_grow)
         sub = arr[y0:y1, x0:x1]
@@ -278,12 +436,14 @@ def stage2_candidates(img300, P):
     return uniq
 
 
-def stage2_read(engs, arr_ref, cands_imgpx, covered, P, scale):
+def stage2_read(engs, arr_ref, cands_imgpx, covered, P, scale, report=None):
     """cands_imgpx: 主底图坐标系下的候选框; scale: 主底图px -> out px;
     候选框来自低分辨率图的会先乘 f_low 转到主底图坐标系."""
     hits = []
     up = P.stage2_upscale
-    for x0, y0, x1, y1 in cands_imgpx:
+    for i, (x0, y0, x1, y1) in enumerate(cands_imgpx):
+        if report:
+            report(i, len(cands_imgpx), hits)
         if covered and any(x0 < c[2] and x1 > c[0] and y0 < c[3] and y1 > c[1] for c in covered):
             continue
         x0, y0, x1, y1 = x0 - P.crop_pad, y0 - P.crop_pad, x1 + P.crop_pad, y1 + P.crop_pad
@@ -429,10 +589,14 @@ def build_parser():
     ap.add_argument("--stages", default=None, help="执行的 stage, 逗号分隔 (缺省按 preset/默认 1,2)")
     ap.add_argument("--reuse-stage1", help="复用某次运行 JSON 的 stage1 命中(跳过 stage1 计算); "
                    "优先读其 raw_stage1, 缺省读 stage==1 的 hits; 保存算力的逐步细化关键参数")
+    ap.add_argument("--resume-stage1", action="store_true",
+                   help="跳过 --checkpoint 中已记录完成(_done_tiles)的 stage1 tile, 只补扫剩余")
     ap.add_argument("--reuse-stage2", help="复用某次运行 JSON 的 stage2 命中(跳过 stage2 计算)")
     # --- stage 1 ---
     ap.add_argument("--stage1-mode", default="grid", choices=["grid", "contour"],
                     help="grid=盲tile网格; contour=内容轮廓检测+二分细分(跳过空白区)")
+    ap.add_argument("--jobs", type=int, default=1,
+                    help="stage1 tile 并行进程数(默认1=串行; 多核大图建议设核数-1)")
     ap.add_argument("--stage1-engines", default="v4", help="全页扫引擎: v4,v5en,v6,tess")
     ap.add_argument("--tile", type=int, default=3000, help="stage1 tile 边长(px@img-dpi)")
     ap.add_argument("--overlap", type=int, default=400)
@@ -450,6 +614,8 @@ def build_parser():
                     help="contour模式: 区域外扩px(给det留上下文)")
     # --- stage 2 ---
     ap.add_argument("--stage2-engines", default="v4,v6", help="候补 crop 引擎")
+    ap.add_argument("--dml", action="store_true",
+                    help="Windows 原生运行时启用 DirectML (rapidocr use_dml=True)")
     ap.add_argument("--glyph-min-h", type=int, default=5, help="单字形高范围(低分辨率图px)")
     ap.add_argument("--glyph-max-h", type=int, default=28)
     ap.add_argument("--glyph-min-w", type=int, default=2)
@@ -475,6 +641,12 @@ def build_parser():
     # --- 输出 ---
     ap.add_argument("--runs-dir", default=None,
                     help="运行 JSON 归档目录(默认 <img 同目录>/ai_ocr_runs); 每次必存")
+    ap.add_argument("--progress", action="store_true",
+                    help="汇报中间进度: stderr 打印已完成块/总数/耗时/ETA/命中数")
+    ap.add_argument("--checkpoint", metavar="PATH",
+                    help="每 --checkpoint-every 秒把当前 raw_stage1/raw_stage2 中间结果落盘(可用 --reuse-* 续跑; 中断自动保存)")
+    ap.add_argument("--checkpoint-every", type=int, default=120,
+                    help="checkpoint 落盘间隔秒数(默认 120, 仅 --checkpoint 有效)")
     ap.add_argument("--out", help="指向最新运行的副本路径(可选)")
     ap.add_argument("--sheet", help="视觉签收拼图 PNG(可选)")
     ap.add_argument("--sheet-pad", type=int, default=100, help="签收图 crop 半径(px@img-dpi)")
@@ -510,9 +682,10 @@ def main():
         img_low = img.resize((img.width // 2, img.height // 2), Image.LANCZOS)
 
     stages = {int(s) for s in P.stages.split(",") if s.strip()}
-    engs1 = {n: make_engine(n, P.max_side_len or None) for n in
+    use_dml = getattr(P, "dml", False)
+    engs1 = {n: make_engine(n, P.max_side_len or None, use_dml) for n in
              [x.strip() for x in P.stage1_engines.split(",") if x.strip()]}
-    engs2 = {n: make_engine(n, P.max_side_len or None) for n in
+    engs2 = {n: make_engine(n, P.max_side_len or None, use_dml) for n in
              [x.strip() for x in P.stage2_engines.split(",") if x.strip()]}
 
     def load_reused(path, stage):
@@ -527,20 +700,58 @@ def main():
         return hits
 
     hits1, hits2, n_regions = [], [], 0
+    cp1 = cp2 = None
+    if P.checkpoint:
+        cp1 = os.path.join(P.checkpoint, "cp_stage1.json")
+        cp2 = os.path.join(P.checkpoint, "cp_stage2.json")
+        os.makedirs(P.checkpoint, exist_ok=True)
+    resume_done = None
     if P.reuse_stage1:
         hits1 = load_reused(P.reuse_stage1, 1)
     elif 1 in stages:
+        if P.resume_stage1 and os.path.exists(cp1):
+            rcp = json.load(open(cp1))
+            resume_done = set(rcp.get("_done_tiles") or [])
+            if resume_done:
+                hits1 = list(rcp.get("raw_stage1") or [])
+                sys.stderr.write(f"[resume] stage1 复用已扫完 tile x{len(resume_done)} "
+                                 f"(hits={len(hits1)}), 只补剩余…\n")
+                sys.stderr.flush()
+        prog1 = Progress("stage1", 1, -1, cp1, P.out_dpi, P.img_dpi, P.checkpoint_every) if P.progress or P.checkpoint else None
+        if prog1:
+            signal.signal(signal.SIGINT, _sigint)
+            prog1.done_tiles = sorted(resume_done) if resume_done else []
+            if P.stage1_mode == "grid":
+                H, W = arr.shape[:2]
+                prog1.total = ((H + P.tile - P.overlap - 1) // (P.tile - P.overlap)) * \
+                              ((W + P.tile - P.overlap - 1) // (P.tile - P.overlap))
+        def rep1(n, total, hits, tile_idx=None):
+            if prog1:
+                prog1.total = total if prog1.total in (-1, None) else prog1.total
+                prog1.tick(hits, tile_idx)
         if P.stage1_mode == "contour":
-            hits1, n_regions = stage1_contour(engs1, arr, scale, P)
+            hits1b, n_regions = stage1_contour(engs1, arr, scale, P, report=rep1)
+            hits1 = hits1 + hits1b
         else:
-            hits1 = stage1_grid(engs1, arr, scale, P)
+            hits1b = stage1_grid(engs1, arr, scale, P, report=rep1, resume_done=resume_done)
+            hits1 = hits1 + hits1b
+        if prog1:
+            prog1.done(hits1)
     if P.reuse_stage2:
         hits2 = load_reused(P.reuse_stage2, 2)
     elif 2 in stages:
         covered = [_bbox(h["box"]) for h in hits1]
         cands = stage2_candidates(img_low, P)
         cands_imgpx = [(c[0] * f_low, c[1] * f_low, c[2] * f_low, c[3] * f_low) for c in cands]
-        hits2 = stage2_read(engs2, arr, cands_imgpx, covered, P, scale)
+        prog2 = Progress("stage2", 2, len(cands_imgpx), cp2, P.out_dpi, P.img_dpi, P.checkpoint_every) if P.progress or P.checkpoint else None
+        if prog2:
+            signal.signal(signal.SIGINT, _sigint)
+        def rep2(n, total, hits):
+            if prog2:
+                prog2.tick(hits)
+        hits2 = stage2_read(engs2, arr, cands_imgpx, covered, P, scale, report=rep2)
+        if prog2:
+            prog2.done(hits2)
 
     per_engine = {}
     for h in hits1 + hits2:
