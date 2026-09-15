@@ -3,6 +3,83 @@
 本文件沉淀项目的架构决策与工作思路(为什么这么设计)。操作规则见 `agent.md`,
 实证配方见 `best_practices.md`, 后续路线见 `TODO.md`。
 
+## 0. 目录规范与职责
+
+```
+radio-service-note/
+├── agent.md                 # 操作规则
+├── architecture.md          # 本文档(架构决策)
+├── best_practices.md        # 实证配方/参数调优记录
+├── TODO.md                  # 后续路线
+├── cluster.md               # 集群/拓扑/硬件诊断记录
+├── components_index.json    # (项目级)全局器件索引入口
+├── tools/                   # 核心工具代码
+│   ├── ai_ocr_eval/
+│   │   ├── ai_refdes_ocr.py     # 主 OCR 工具
+│   │   ├── dml_helper.py        # Windows DirectML 强制钩子
+│   │   ├── eval_refdes.py       # 评估/对比脚本
+│   │   └── probe_anchor.py      # 锚点探测
+│   ├── render_rx_flow.py        # RX 流程渲染(PNG)
+│   ├── annotate_svg_flow/       # SVG 分层标注工具
+│   └── annotate_rx_flow/        # RX 专用标注工具
+├── projects/
+│   └── icom2200h/
+│       ├── components_index.json   # 该机型器件索引(枢纽)
+│       ├── nettable/               # 元器件识别后的结构化数据库
+│       │   ├── wpts_rx_top_v8.json   # RX 顶视图流程点
+│       │   ├── wpts_rx_bot_v7.json   # RX 底视图流程点
+│       │   ├── chain_order_rx.json   # 链序
+│       │   └── SCHEMA.md             # 字段规范
+│       ├── render/                 # PCB 渲染源图(只读, pdftoppm -r dpi -png 导出自同名 PDF)
+│       │   ├── pcb-top-600-1.png     # ← pcb-top.pdf @600dpi
+│       │   ├── pcb-top-300-1.png     # ← pcb-top.pdf @300dpi
+│       │   ├── pcb-bot-600-1.png     # ← pcb-bot.pdf @600dpi
+│       │   ├── pcb-bot-300-1.png     # ← pcb-bot.pdf @300dpi
+│       │   ├── rxtx-sch-600-1.png    # ← rxtx-flow-sch.pdf @600dpi
+│       │   └── rxtx-sch-300-1.png    # ← rxtx-flow-sch.pdf @300dpi
+│       ├── crops/                  # 图片切割/截图/裁切片
+│       │   ├── board_tiles/         # 全板网格切片(200x200, 40重叠)
+│       │   │   ├── tiles_index.json   # 切片索引(坐标/原图映射)
+│       │   │   └── tile_*.png
+│       │   └── board_tiles_bot/     # 底视图切片
+│       ├── annot/                  # 最终标注输出(仅 SVG + PNG)
+│       │   ├── rx_flow_top_v8.svg
+│       │   ├── rx_flow_top_v8.png
+│       │   ├── rx_flow_bot_v8.svg
+│       │   └── rx_flow_bot_v8.png
+│       ├── svg_runs/               # 渲染中间归档(仅必要文件)
+│       │   └── rx_flow_top_v8_*/    # 单次渲染归档(带参数快照)
+│       └── ocr_runs/               # OCR 运行归档(只读归档)
+│           ├── top600_work/        # 600dpi 顶视图全板
+│           ├── bot600_work/        # 600dpi 底视图全板
+│           ├── dml_full/           # Windows DML 全板(v4+v5s)
+│           ├── dml_full2/          # Windows DML 全板(v5s+v6)
+│           ├── dml_test/           # DML 冒烟测试
+│           ├── cp/                 # checkpoint 目录
+│           └── ai_ocr_runs/        # 单次运行 JSON 归档
+```
+
+### 目录职责分工
+
+| 目录 | 方向 | 内容 | 负责工具/阶段 |
+|------|------|------|--------------|
+| `render/` | 只读输入 | pdftoppm 600/300dpi 输出的 PCB 光栅图 | pdf→png 渲染 |
+| `crops/` | 中间产物 | 全板切片、感兴趣区裁切、坐标映射索引 | 切片脚本、定位 |
+| `annot/` | 最终输出 | **仅** SVG + PNG 标注图(给人看/存档) | `annotate_svg_flow`, `render_rx_flow.py` |
+| `svg_runs/` | 中间归档 | 单次渲染的完整中间文件+参数快照(可复现) | `annotate_svg_flow` |
+| `nettable/` | 结构化数据库 | 识别后的元器件/流程/链序/锚点 JSON | OCR 识别 → 索引构建 |
+| `ocr_runs/` | 只读归档 | 各次 OCR 运行的完整 JSON 归档 | `ai_refdes_ocr.py` |
+
+### 清理规则
+- **annot/ 下严禁子目录** —— 仅放最终 `*.svg` `*.png`
+- **svg_runs/ 仅保留必要中间文件** —— 渲染参数快照 + 单次运行 SVG
+- **crops/ 仅存图片切割/索引** —— 无 JSON 归档
+- **nettable/ 仅存结构化 JSON** —— 无图片、无临时文件
+- **ocr_runs/ 下严禁 annot/、crops/、svg_runs/ 子目录** —— 仅 OCR 运行归档
+- **根目录、项目根目录不留散落文件** —— 统一归类
+
+---
+
 ## 1. 数据流总架构
 
 ```
