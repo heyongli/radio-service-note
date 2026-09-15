@@ -184,11 +184,13 @@ pdftoppm -r 600 -png xx-top.pdf top600
 
 - 脚本与文档放 `tools/<tool名>/`,各自目录带 README.md;
 - 产出分类放独立目录,**禁止混放**(含旧 `extract/`,已废弃删除):
-  `render/`=PDF 渲染底图、`scan/`=读图窗口/图签、`nettable/`=网表 JSON
-  (含 waypoints)、`annot/`=标注成品、`archive/old_extract/`=历史调试文件;
+  `render/`=PDF 渲染底图、`crops/`=切片/裁切+索引、`nettable/`=网表 JSON
+  (含 waypoints/SCHEMA.md/components_index)、`annot/`=标注成品(**仅** SVG+PNG, 严禁子目录)、
+  `svg_runs/`=SVG 渲染归档(含参数快照)、`ocr_runs/`=AI-OCR 运行归档(只增不删,
+  严禁 annot/crops/svg_runs 子目录); 详见 architecture.md 第 0 章;
 - 新增目录约定(2026-09-10): `nettable/ai_ocr_runs/`=AI-OCR 运行归档(只增
   不删)、`nettable/components_index.json`=元器件索引(枢纽, 必须保持新鲜)、
-  `annot/svg_runs/`=SVG 渲染归档;
+  `svg_runs/`=SVG 渲染归档(2026-09-15 从 annot/ 提升至项目根);
 - 临时中间件放 `/tmp/opencode/`(600dpi 大图等),网表 JSON 里记录其路径。
 
 ## 8. 标注与数据层(2026-09-10 新增)
@@ -202,8 +204,8 @@ pdftoppm -r 600 -png xx-top.pdf top600
   `nettable/components_index.json` 解析坐标(架构见 architecture.md)。
 - **nettable 数据规范**见 `projects/<机型>/nettable/SCHEMA.md`:
   300dpi 统一坐标空间、provenance 必填、状态三态、revisions 留痕。
-- 中间结果常态化保存: AI 运行 JSON 归档 `nettable/ai_ocr_runs/`(校准
-  资产, 只在确认乱套时删); SVG 渲染归档 `annot/svg_runs/`。
+- 中间结果常态化保存: AI 运行 JSON 归档 `ocr_runs/`(2026-09-15 移出
+  nettable/)(校准资产, 只在确认乱套时删); SVG 渲染归档 `svg_runs/`。
 
 ## 9. 任务推进建议(已完成部分)
 

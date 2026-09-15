@@ -1,0 +1,47 @@
+{
+ "tool_version": "0.2.2",
+ "date": "2026-09-11T15:40:16",
+ "script_sha1": "b5fb8bdd53e5",
+ "params": {
+  "base": "projects/icom2200h/render/pcb-top-300-1.png",
+  "base_dpi": 300,
+  "wpt_dpi": 300,
+  "wpts": [
+   "projects/icom2200h/nettable/wpts_rx_flow_v4.json"
+  ],
+  "only_layers": null,
+  "layer_style": [
+   "ctrl:color=#0097A7,opacity=0.6"
+  ],
+  "label_color": "#0d47a1",
+  "dot_r": 7,
+  "stroke_w": 6,
+  "font_size": 24,
+  "dash_array": "10 8",
+  "arrow_len": 24,
+  "via_color": "#b8860b",
+  "dot_stroke": 2,
+  "via_stroke": 1.5,
+  "note_scale": 0.62,
+  "halo_scale": 0.14,
+  "rect_fill_opacity": 0.12,
+  "text_halo": true,
+  "runs_dir": "projects/icom2200h/annot/svg_runs",
+  "out": "projects/icom2200h/annot/rx_flow_v4.svg",
+  "png": "projects/icom2200h/annot/rx_flow_v4.png",
+  "png_dpi": 96,
+  "tag": "rx-v4.4",
+  "note": ""
+ },
+ "layer_counts": {
+  "rx": 1,
+  "ctrl": 7,
+  "marks": 2,
+  "notes": 2
+ },
+ "base_size": [
+  2550,
+  3300
+ ],
+ "note": ""
+}

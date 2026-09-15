@@ -16,7 +16,7 @@ Inkscape 可编辑的分层 SVG(底图 base64 内嵌+锁定), 可导 PNG。
 ```bash
 python3 annotate_svg_flow.py --base projects/IC-2200H/render/rxtx300-1.png \
     --wpts projects/IC-2200H/nettable/wpts_rxtx_sch.json \
-    --runs-dir projects/IC-2200H/annot/svg_runs \
+    --runs-dir projects/IC-2200H/svg_runs \
     --out projects/IC-2200H/annot/rxtx_flow.svg \
     --png projects/IC-2200H/annot/rxtx_flow.png --tag rxtx-v3
 ```

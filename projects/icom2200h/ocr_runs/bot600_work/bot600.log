@@ -1,0 +1,136 @@
+2026-09-14 21:19:35,360 - RapidOCR - INFO: Using engine_name: onnxruntime
+2026-09-14 21:19:35,604 - RapidOCR - INFO: File exists and is valid: /home/radio/.local/lib/python3.12/site-packages/rapidocr/models/ch_PP-OCRv5_det_server.onnx
+2026-09-14 21:19:35,605 - RapidOCR - INFO: Using /home/radio/.local/lib/python3.12/site-packages/rapidocr/models/ch_PP-OCRv5_det_server.onnx
+2026-09-14 21:19:36,031 - RapidOCR - INFO: Using engine_name: onnxruntime
+2026-09-14 21:19:36,038 - RapidOCR - INFO: File exists and is valid: /home/radio/.local/lib/python3.12/site-packages/rapidocr/models/ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx
+2026-09-14 21:19:36,038 - RapidOCR - INFO: Using /home/radio/.local/lib/python3.12/site-packages/rapidocr/models/ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx
+2026-09-14 21:19:36,058 - RapidOCR - INFO: Using engine_name: onnxruntime
+2026-09-14 21:19:36,294 - RapidOCR - INFO: File exists and is valid: /home/radio/.local/lib/python3.12/site-packages/rapidocr/models/ch_PP-OCRv5_rec_server.onnx
+2026-09-14 21:19:36,294 - RapidOCR - INFO: Using /home/radio/.local/lib/python3.12/site-packages/rapidocr/models/ch_PP-OCRv5_rec_server.onnx
+2026-09-14 21:19:37,035 - RapidOCR - INFO: Using engine_name: onnxruntime
+2026-09-14 21:19:37,069 - RapidOCR - INFO: File exists and is valid: /home/radio/.local/lib/python3.12/site-packages/rapidocr/models/PP-OCRv6_det_small.onnx
+2026-09-14 21:19:37,069 - RapidOCR - INFO: Using /home/radio/.local/lib/python3.12/site-packages/rapidocr/models/PP-OCRv6_det_small.onnx
+2026-09-14 21:19:37,130 - RapidOCR - INFO: Using engine_name: onnxruntime
+2026-09-14 21:19:37,133 - RapidOCR - INFO: File exists and is valid: /home/radio/.local/lib/python3.12/site-packages/rapidocr/models/ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx
+2026-09-14 21:19:37,133 - RapidOCR - INFO: Using /home/radio/.local/lib/python3.12/site-packages/rapidocr/models/ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx
+2026-09-14 21:19:37,152 - RapidOCR - INFO: Using engine_name: onnxruntime
+2026-09-14 21:19:37,224 - RapidOCR - INFO: File exists and is valid: /home/radio/.local/lib/python3.12/site-packages/rapidocr/models/PP-OCRv6_rec_small.onnx
+2026-09-14 21:19:37,224 - RapidOCR - INFO: Using /home/radio/.local/lib/python3.12/site-packages/rapidocr/models/PP-OCRv6_rec_small.onnx
+[stage1] 1/120 ( 0.8%) elapsed   132s ETA 15657s tile-avg 131.6s hits=0
+
+[checkpoint] stage1 n=0 1/120 -> ocr_runs/cp/cp_stage1.json
+[stage1] 3/120 ( 2.5%) elapsed   137s ETA  5361s tile-avg 45.8s hits=1
+[stage1] 4/120 ( 3.3%) elapsed   143s ETA  4147s tile-avg 35.8s hits=5
+[stage1] 6/120 ( 5.0%) elapsed   159s ETA  3025s tile-avg 26.5s hits=14
+[stage1] 8/120 ( 6.7%) elapsed   180s ETA  2525s tile-avg 22.5s hits=34
+2026-09-14 21:23:15,937 - RapidOCR - WARNING: The text detection result is empty
+[stage1] 9/120 ( 7.5%) elapsed   230s ETA  2831s tile-avg 25.5s hits=50
+
+[checkpoint] stage1 n=50 9/120 -> ocr_runs/cp/cp_stage1.json
+[stage1] 10/120 ( 8.3%) elapsed   261s ETA  2872s tile-avg 26.1s hits=50
+[stage1] 11/120 ( 9.2%) elapsed   279s ETA  2761s tile-avg 25.3s hits=50
+2026-09-14 21:24:28,956 - RapidOCR - WARNING: The text detection result is empty
+[stage1] 12/120 (10.0%) elapsed   289s ETA  2597s tile-avg 24.0s hits=52
+[stage1] 13/120 (10.8%) elapsed   306s ETA  2519s tile-avg 23.5s hits=52
+[stage1] 14/120 (11.7%) elapsed   332s ETA  2511s tile-avg 23.7s hits=67
+
+[checkpoint] stage1 n=67 14/120 -> ocr_runs/cp/cp_stage1.json
+[stage1] 15/120 (12.5%) elapsed   343s ETA  2400s tile-avg 22.9s hits=75
+[stage1] 16/120 (13.3%) elapsed   349s ETA  2268s tile-avg 21.8s hits=92
+2026-09-14 21:25:53,194 - RapidOCR - WARNING: The text detection result is empty
+[stage1] 17/120 (14.2%) elapsed   382s ETA  2315s tile-avg 22.5s hits=92
+[stage1] 18/120 (15.0%) elapsed   402s ETA  2279s tile-avg 22.3s hits=92
+[stage1] 19/120 (15.8%) elapsed   409s ETA  2177s tile-avg 21.6s hits=107
+[stage1] 20/120 (16.7%) elapsed   429s ETA  2144s tile-avg 21.4s hits=116
+
+[checkpoint] stage1 n=116 20/120 -> ocr_runs/cp/cp_stage1.json
+2026-09-14 21:27:02,914 - RapidOCR - WARNING: The text detection result is empty
+[stage1] 21/120 (17.5%) elapsed   494s ETA  2330s tile-avg 23.5s hits=116
+[stage1] 22/120 (18.3%) elapsed   545s ETA  2426s tile-avg 24.8s hits=116
+
+[checkpoint] stage1 n=116 22/120 -> ocr_runs/cp/cp_stage1.json
+[stage1] 23/120 (19.2%) elapsed   555s ETA  2340s tile-avg 24.1s hits=121
+[stage1] 24/120 (20.0%) elapsed   572s ETA  2288s tile-avg 23.8s hits=146
+[stage1] 25/120 (20.8%) elapsed   586s ETA  2226s tile-avg 23.4s hits=188
+2026-09-14 21:30:09,650 - RapidOCR - WARNING: The text detection result is empty
+[stage1] 26/120 (21.7%) elapsed   649s ETA  2347s tile-avg 25.0s hits=188
+
+[checkpoint] stage1 n=188 26/120 -> ocr_runs/cp/cp_stage1.json
+[stage1] 27/120 (22.5%) elapsed   662s ETA  2279s tile-avg 24.5s hits=236
+2026-09-14 21:31:08,898 - RapidOCR - WARNING: The text detection result is empty
+[stage1] 28/120 (23.3%) elapsed   729s ETA  2396s tile-avg 26.0s hits=236
+[stage1] 29/120 (24.2%) elapsed   740s ETA  2321s tile-avg 25.5s hits=236
+
+[checkpoint] stage1 n=236 29/120 -> ocr_runs/cp/cp_stage1.json
+[stage1] 30/120 (25.0%) elapsed   828s ETA  2484s tile-avg 27.6s hits=311
+[stage1] 31/120 (25.8%) elapsed   868s ETA  2493s tile-avg 28.0s hits=432
+
+[checkpoint] stage1 n=432 31/120 -> ocr_runs/cp/cp_stage1.json
+[stage1] 32/120 (26.7%) elapsed   888s ETA  2443s tile-avg 27.8s hits=450
+[stage1] 33/120 (27.5%) elapsed   899s ETA  2369s tile-avg 27.2s hits=519
+[stage1] 34/120 (28.3%) elapsed   935s ETA  2365s tile-avg 27.5s hits=662
+[stage1] 35/120 (29.2%) elapsed   951s ETA  2310s tile-avg 27.2s hits=663
+2026-09-14 21:36:01,458 - RapidOCR - WARNING: The text detection result is empty
+[stage1] 36/120 (30.0%) elapsed  1007s ETA  2350s tile-avg 28.0s hits=663
+
+[checkpoint] stage1 n=663 36/120 -> ocr_runs/cp/cp_stage1.json
+2026-09-14 21:37:01,971 - RapidOCR - WARNING: The text detection result is empty
+[stage1] 37/120 (30.8%) elapsed  1073s ETA  2407s tile-avg 29.0s hits=663
+[stage1] 38/120 (31.7%) elapsed  1180s ETA  2546s tile-avg 31.1s hits=663
+
+[checkpoint] stage1 n=663 38/120 -> ocr_runs/cp/cp_stage1.json
+[stage1] 40/120 (33.3%) elapsed  1248s ETA  2496s tile-avg 31.2s hits=821
+[stage1] 41/120 (34.2%) elapsed  1354s ETA  2608s tile-avg 33.0s hits=960
+
+[checkpoint] stage1 n=960 41/120 -> ocr_runs/cp/cp_stage1.json
+[stage1] 42/120 (35.0%) elapsed  1360s ETA  2526s tile-avg 32.4s hits=1044
+[stage1] 44/120 (36.7%) elapsed  1370s ETA  2367s tile-avg 31.1s hits=1081
+[stage1] 45/120 (37.5%) elapsed  1402s ETA  2337s tile-avg 31.2s hits=1152
+[stage1] 46/120 (38.3%) elapsed  1411s ETA  2270s tile-avg 30.7s hits=1344
+2026-09-14 21:44:12,123 - RapidOCR - WARNING: The text detection result is empty
+[stage1] 48/120 (40.0%) elapsed  1441s ETA  2161s tile-avg 30.0s hits=1599
+[stage1] 49/120 (40.8%) elapsed  1448s ETA  2097s tile-avg 29.5s hits=1709
+
+[checkpoint] stage1 n=1709 49/120 -> ocr_runs/cp/cp_stage1.json
+[stage1] 50/120 (41.7%) elapsed  1474s ETA  2064s tile-avg 29.5s hits=1709
+2026-09-14 21:45:15,903 - RapidOCR - WARNING: The text detection result is empty
+[stage1] 51/120 (42.5%) elapsed  1492s ETA  2018s tile-avg 29.2s hits=1709
+[stage1] 52/120 (43.3%) elapsed  1543s ETA  2018s tile-avg 29.7s hits=1710
+
+[checkpoint] stage1 n=1710 52/120 -> ocr_runs/cp/cp_stage1.json
+[stage1] 54/120 (45.0%) elapsed  1559s ETA  1906s tile-avg 28.9s hits=1720
+[stage1] 55/120 (45.8%) elapsed  1570s ETA  1855s tile-avg 28.5s hits=1720
+[stage1] 56/120 (46.7%) elapsed  1588s ETA  1814s tile-avg 28.3s hits=1735
+[stage1] 57/120 (47.5%) elapsed  1596s ETA  1764s tile-avg 28.0s hits=1735
+2026-09-14 21:47:20,049 - RapidOCR - WARNING: The text detection result is empty
+[stage1] 59/120 (49.2%) elapsed  1626s ETA  1681s tile-avg 27.6s hits=1751
+[stage1] 60/120 (50.0%) elapsed  1669s ETA  1669s tile-avg 27.8s hits=1779
+
+[checkpoint] stage1 n=1779 60/120 -> ocr_runs/cp/cp_stage1.json
+2026-09-14 21:48:26,911 - RapidOCR - WARNING: The text detection result is empty
+[stage1] 61/120 (50.8%) elapsed  1687s ETA  1632s tile-avg 27.7s hits=1779
+[stage1] 63/120 (52.5%) elapsed  1709s ETA  1546s tile-avg 27.1s hits=1779
+[stage1] 64/120 (53.3%) elapsed  1716s ETA  1502s tile-avg 26.8s hits=1779
+[stage1] 66/120 (55.0%) elapsed  1751s ETA  1433s tile-avg 26.5s hits=1779
+2026-09-14 21:50:03,807 - RapidOCR - WARNING: The text detection result is empty
+[stage1] 67/120 (55.8%) elapsed  1799s ETA  1423s tile-avg 26.9s hits=1779
+
+[checkpoint] stage1 n=1779 67/120 -> ocr_runs/cp/cp_stage1.json
+[stage1] 68/120 (56.7%) elapsed  1820s ETA  1392s tile-avg 26.8s hits=1789
+[stage1] 69/120 (57.5%) elapsed  1834s ETA  1356s tile-avg 26.6s hits=1790
+2026-09-14 21:51:49,381 - RapidOCR - WARNING: The text detection result is empty
+[stage1] 70/120 (58.3%) elapsed  1880s ETA  1343s tile-avg 26.9s hits=1790
+[stage1] 71/120 (59.2%) elapsed  1891s ETA  1305s tile-avg 26.6s hits=1790
+
+[checkpoint] stage1 n=1790 71/120 -> ocr_runs/cp/cp_stage1.json
+[stage1] 73/120 (60.8%) elapsed  1920s ETA  1236s tile-avg 26.3s hits=1790
+[stage1] 74/120 (61.7%) elapsed  1946s ETA  1210s tile-avg 26.3s hits=1790
+[stage1] 75/120 (62.5%) elapsed  1953s ETA  1172s tile-avg 26.0s hits=1790
+[stage1] 76/120 (63.3%) elapsed  1960s ETA  1135s tile-avg 25.8s hits=1790
+2026-09-14 21:53:30,580 - RapidOCR - WARNING: The text detection result is empty
+[stage1] 77/120 (64.2%) elapsed  1971s ETA  1101s tile-avg 25.6s hits=1790
+[stage1] 78/120 (65.0%) elapsed  1998s ETA  1076s tile-avg 25.6s hits=1790
+
+[checkpoint] stage1 n=1790 78/120 -> ocr_runs/cp/cp_stage1.json
+
+[interrupted] checkpoint saved

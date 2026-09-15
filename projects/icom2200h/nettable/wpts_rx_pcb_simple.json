@@ -1,0 +1,50 @@
+[
+  {
+    "label": "J11 ANT Input",
+    "px": [
+      1279,
+      1489
+    ],
+    "note": "confirmed"
+  },
+  {
+    "label": "Q27 RF-AMP",
+    "px": [
+      1200,
+      1180
+    ],
+    "note": "unverified"
+  },
+  {
+    "label": "IC4 Mixer/IF",
+    "px": [
+      1800,
+      1500
+    ],
+    "note": "unverified"
+  },
+  {
+    "label": "F13 IF Filter 1",
+    "px": [
+      1647,
+      1159
+    ],
+    "note": "unverified"
+  },
+  {
+    "label": "F14 IF Filter 2",
+    "px": [
+      1700,
+      1450
+    ],
+    "note": "unverified"
+  },
+  {
+    "label": "Q26 IF-AMP",
+    "px": [
+      1400,
+      1200
+    ],
+    "note": "unverified"
+  }
+]

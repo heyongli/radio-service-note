@@ -354,8 +354,16 @@ def main():
     now2 = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     script_sha = hashlib.sha1(open(os.path.abspath(__file__), "rb").read()).hexdigest()[:12]
     run_file = f"{now2}{('_' + args.tag) if args.tag else ''}_v{TOOL_VERSION}_{script_sha}.svg"
-    runs_dir = args.runs_dir or os.path.join(os.path.dirname(os.path.abspath(args.base)),
-                                             "svg_runs")
+    runs_dir = args.runs_dir
+    if not runs_dir:
+        base_dir = os.path.dirname(os.path.abspath(args.base))
+        # 如果 base 在 <project>/render/, 默认 svg_runs 放 <project>/svg_runs
+        # 如果 base 在 <project>/annot/, 默认 svg_runs 放 <project>/svg_runs
+        # 否则回退到 base 同目录的 svg_runs
+        if base_dir.endswith("/render") or base_dir.endswith("/annot"):
+            runs_dir = os.path.join(os.path.dirname(base_dir), "svg_runs")
+        else:
+            runs_dir = os.path.join(base_dir, "svg_runs")
     os.makedirs(runs_dir, exist_ok=True)
     svg_path = os.path.join(runs_dir, run_file)
     tree.write(svg_path, xml_declaration=True, encoding="UTF-8")

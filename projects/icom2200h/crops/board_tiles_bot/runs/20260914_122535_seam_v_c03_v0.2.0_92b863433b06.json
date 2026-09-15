@@ -1,0 +1,472 @@
+{
+ "run_id": "20260914_122535_seam_v_c03_v0.2.0_92b863433b06.json",
+ "tool_version": "0.2.0",
+ "tool_script_sha1": "92b863433b06",
+ "date": "2026-09-14T12:25:35",
+ "params": {
+  "img": "projects/icom2200h/crops/board_tiles_bot/seam_v_c03.png",
+  "img_dpi": 300,
+  "out_dpi": 300,
+  "img_low": null,
+  "preset": "full",
+  "stages": "1,2",
+  "reuse_stage1": null,
+  "reuse_stage2": null,
+  "stage1_mode": "grid",
+  "stage1_engines": "v4",
+  "tile": 3000,
+  "overlap": 400,
+  "stage1_upscale": 1.0,
+  "stage1_rots": "0",
+  "max_side_len": 0,
+  "content_min_area": 300,
+  "close_kx": 25,
+  "close_ky": 9,
+  "region_max": 2000,
+  "region_grow": 60,
+  "stage2_engines": "v4,v6",
+  "glyph_min_h": 5,
+  "glyph_max_h": 28,
+  "glyph_min_w": 2,
+  "glyph_max_w": 24,
+  "glyph_min_area": 12,
+  "cluster_r": 20,
+  "cand_min_w": 8,
+  "cand_max_w": 120,
+  "cand_min_h": 6,
+  "mask_dark": 110,
+  "mask_light": 200,
+  "crop_pad": 14,
+  "min_crop_w": 48,
+  "min_crop_h": 32,
+  "stage2_upscale": 4,
+  "stage2_preprocess": "graycontrast",
+  "asm_gap": 12,
+  "asm_dh": 6,
+  "asm_maxfrag": 6,
+  "dedup_dist": 25,
+  "runs_dir": "projects/icom2200h/crops/board_tiles_bot/runs",
+  "out": "projects/icom2200h/crops/board_tiles_bot/seam_v_c03_ocr.json",
+  "sheet": null,
+  "sheet_pad": 100,
+  "sheet_cell": 260,
+  "tag": "seam_v_c03",
+  "note": "",
+  "only_refdes": true,
+  "keep_raw": true
+ },
+ "engine_versions": {
+  "rapidocr_onnxruntime": "1.4.4"
+ },
+ "engines": {
+  "stage1": {
+   "v4": "rapidocr-onnxruntime/PP-OCRv4-mobile"
+  },
+  "stage2": {
+   "v4": "rapidocr-onnxruntime/PP-OCRv4-mobile",
+   "v6": "rapidocr/PP-OCRv6-small"
+  }
+ },
+ "img": "/home/radio/radio-service-note/projects/icom2200h/crops/board_tiles_bot/seam_v_c03.png",
+ "note": "",
+ "time_s": 9.5,
+ "n_stage1": 11,
+ "n_stage2": 0,
+ "n_merged": 5,
+ "n_regions": 0,
+ "n_refdes": 5,
+ "n_agree": 0,
+ "hits": [
+  {
+   "text": "R109",
+   "norm": "R109",
+   "conf": 0.804,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    70,
+    702
+   ],
+   "refdes_like": true
+  },
+  {
+   "text": "B10",
+   "norm": "B10",
+   "conf": 0.802,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    70,
+    672
+   ],
+   "refdes_like": true
+  },
+  {
+   "text": "C293",
+   "norm": "C293",
+   "conf": 0.753,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    67,
+    798
+   ],
+   "refdes_like": true
+  },
+  {
+   "text": "IC6",
+   "norm": "IC6",
+   "conf": 0.721,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    36,
+    788
+   ],
+   "refdes_like": true
+  },
+  {
+   "text": "C1381",
+   "norm": "C1381",
+   "conf": 0.699,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    61,
+    932
+   ],
+   "refdes_like": true
+  }
+ ],
+ "raw_stage1": [
+  {
+   "text": "B10",
+   "conf": 0.802,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    70,
+    672
+   ],
+   "box": [
+    [
+     63,
+     666
+    ],
+    [
+     77,
+     667
+    ],
+    [
+     76,
+     677
+    ],
+    [
+     62,
+     677
+    ]
+   ]
+  },
+  {
+   "text": "3",
+   "conf": 0.807,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    4,
+    688
+   ],
+   "box": [
+    [
+     0,
+     683
+    ],
+    [
+     8,
+     683
+    ],
+    [
+     8,
+     692
+    ],
+    [
+     0,
+     692
+    ]
+   ]
+  },
+  {
+   "text": "R109",
+   "conf": 0.804,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    70,
+    702
+   ],
+   "box": [
+    [
+     61,
+     697
+    ],
+    [
+     79,
+     698
+    ],
+    [
+     79,
+     707
+    ],
+    [
+     61,
+     706
+    ]
+   ]
+  },
+  {
+   "text": "R1C6lC153",
+   "conf": 0.887,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    36,
+    718
+   ],
+   "box": [
+    [
+     11,
+     713
+    ],
+    [
+     60,
+     713
+    ],
+    [
+     60,
+     723
+    ],
+    [
+     11,
+     723
+    ]
+   ]
+  },
+  {
+   "text": "[6710",
+   "conf": 0.552,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    19,
+    733
+   ],
+   "box": [
+    [
+     8,
+     727
+    ],
+    [
+     31,
+     727
+    ],
+    [
+     31,
+     739
+    ],
+    [
+     7,
+     739
+    ]
+   ]
+  },
+  {
+   "text": "IC6",
+   "conf": 0.721,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    36,
+    788
+   ],
+   "box": [
+    [
+     29,
+     782
+    ],
+    [
+     42,
+     782
+    ],
+    [
+     42,
+     793
+    ],
+    [
+     29,
+     793
+    ]
+   ]
+  },
+  {
+   "text": "C293",
+   "conf": 0.753,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    67,
+    798
+   ],
+   "box": [
+    [
+     62,
+     789
+    ],
+    [
+     72,
+     789
+    ],
+    [
+     72,
+     807
+    ],
+    [
+     62,
+     807
+    ]
+   ]
+  },
+  {
+   "text": "5",
+   "conf": 0.988,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    29,
+    820
+   ],
+   "box": [
+    [
+     19,
+     812
+    ],
+    [
+     40,
+     813
+    ],
+    [
+     39,
+     827
+    ],
+    [
+     18,
+     826
+    ]
+   ]
+  },
+  {
+   "text": "CF",
+   "conf": 0.702,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    20,
+    915
+   ],
+   "box": [
+    [
+     10,
+     904
+    ],
+    [
+     32,
+     908
+    ],
+    [
+     29,
+     926
+    ],
+    [
+     7,
+     922
+    ]
+   ]
+  },
+  {
+   "text": "6",
+   "conf": 0.818,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    8,
+    932
+   ],
+   "box": [
+    [
+     2,
+     926
+    ],
+    [
+     15,
+     926
+    ],
+    [
+     15,
+     937
+    ],
+    [
+     2,
+     937
+    ]
+   ]
+  },
+  {
+   "text": "C1381",
+   "conf": 0.699,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    61,
+    932
+   ],
+   "box": [
+    [
+     45,
+     924
+    ],
+    [
+     77,
+     924
+    ],
+    [
+     77,
+     940
+    ],
+    [
+     45,
+     940
+    ]
+   ]
+  }
+ ],
+ "raw_stage2": []
+}

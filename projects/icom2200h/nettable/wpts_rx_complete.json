@@ -1,0 +1,74 @@
+[
+  {
+    "label": "J11 ANT Input",
+    "px": [
+      1279,
+      1489
+    ],
+    "note": "RX: confirmed"
+  },
+  {
+    "label": "Q27 RF-AMP",
+    "px": [
+      1200,
+      1180
+    ],
+    "note": "RX: unverified"
+  },
+  {
+    "label": "IC4 Mixer/IF",
+    "px": [
+      1800,
+      1500
+    ],
+    "note": "RX: unverified"
+  },
+  {
+    "label": "F13 IF Filter 1",
+    "px": [
+      1647,
+      1159
+    ],
+    "note": "RX: unverified"
+  },
+  {
+    "label": "F14 IF Filter 2",
+    "px": [
+      1700,
+      1450
+    ],
+    "note": "RX: unverified"
+  },
+  {
+    "label": "Q26 IF-AMP",
+    "px": [
+      1400,
+      1200
+    ],
+    "note": "RX: unverified"
+  },
+  {
+    "label": "D31 AGC Diode",
+    "px": [
+      1400,
+      1550
+    ],
+    "note": "AUX: unverified"
+  },
+  {
+    "label": "IC5 VCO",
+    "px": [
+      1900,
+      1600
+    ],
+    "note": "AUX: unverified"
+  },
+  {
+    "label": "D23 Switch Diode",
+    "px": [
+      1300,
+      1500
+    ],
+    "note": "AUX: unverified"
+  }
+]

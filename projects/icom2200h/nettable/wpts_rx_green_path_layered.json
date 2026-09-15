@@ -1,0 +1,85 @@
+[
+  {
+    "label": "J11 ANT Input",
+    "px": [
+      1279,
+      1489
+    ],
+    "note": "RX: confirmed",
+    "layer": "rx"
+  },
+  {
+    "label": "Q27 RF-AMP",
+    "px": [
+      1200,
+      1180
+    ],
+    "note": "RX: unverified",
+    "layer": "rx"
+  },
+  {
+    "label": "IC4 Mixer/IF",
+    "px": [
+      1800,
+      1500
+    ],
+    "note": "RX: unverified",
+    "layer": "rx"
+  },
+  {
+    "label": "F13 IF Filter 1",
+    "px": [
+      1647,
+      1159
+    ],
+    "note": "RX: unverified",
+    "layer": "rx"
+  },
+  {
+    "label": "F14 IF Filter 2",
+    "px": [
+      1700,
+      1450
+    ],
+    "note": "RX: unverified",
+    "layer": "rx"
+  },
+  {
+    "label": "Q16 IF-AMP",
+    "px": [
+      1000,
+      1000
+    ],
+    "note": "RX: unverified",
+    "layer": "rx"
+  },
+  {
+    "label": "IC12 AF Preamp",
+    "px": [
+      1160,
+      1549
+    ],
+    "note": "RX: unverified",
+    "layer": "rx"
+  },
+  {
+    "label": "D23 AGC Diode",
+    "px": [
+      1300,
+      1500
+    ],
+    "note": "AUX: unverified",
+    "layer": "rx_aux",
+    "dash": true
+  },
+  {
+    "label": "IC6 VCO/PLL",
+    "px": [
+      1856,
+      362
+    ],
+    "note": "AUX: unverified",
+    "layer": "rx_aux",
+    "dash": true
+  }
+]

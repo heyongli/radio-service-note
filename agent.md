@@ -4,7 +4,7 @@
 * 文档分工: agent.md=操作规则 | best_practices.md=实证配方(任务前必读) |
   architecture.md=设计思路与原则 | todo.md=后续路线 | tools/README.md=工具索引与研发进度
 * 旧约定"extract目录"已废弃(2026-09): 中间文件按类型分目录(见下条), 禁止新建/混入 extract/
-* 每个设备/机型(如 IC-2200H)建立项目目录 projects/<机型>/: 源PDF放项目根, 中间文件按类型分目录(禁混放): render/(PDF渲染底图) scan/(读图窗口/图签) nettable/(网表+元器件索引+waypoints JSON, 规范见其 SCHEMA.md) annot/(标注成品, 含 svg_runs/) archive/(历史文件); 临时中间件放 /tmp/opencode/ 并在网表JSON记录路径
+* 每个设备/机型(如 IC-2200H)建立项目目录 projects/<机型>/: 源PDF放项目根, 中间文件按类型分目录(禁混放, 详见 architecture.md 第 0 章): render/(PDF渲染底图) crops/(切片/裁切+索引) nettable/(网表+元器件索引+waypoints JSON, 规范见其 SCHEMA.md) annot/(仅最终 SVG+PNG, 严禁子目录) svg_runs/(渲染中间归档+参数快照) ocr_runs/(OCR 运行归档, 严禁 annot/crops/svg_runs 子目录); 临时中间件放 /tmp/opencode/ 并在网表JSON记录路径
 * 开始任务前先 load best_practices.md, 按其中的已验证结论操作, 避免重复踩坑
 
 ## 最终目的 (用户明确, 2026-09-14 记录)

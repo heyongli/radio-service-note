@@ -1,0 +1,700 @@
+{
+ "run_id": "20260911_154353_pcb_top_scan_v0.2.0_92b863433b06.json",
+ "tool_version": "0.2.0",
+ "tool_script_sha1": "92b863433b06",
+ "date": "2026-09-11T15:43:53",
+ "params": {
+  "img": "projects/icom2200h/render/pcb-top-300-1.png",
+  "img_dpi": 300,
+  "out_dpi": 300,
+  "img_low": null,
+  "preset": "fast",
+  "stages": "1",
+  "reuse_stage1": null,
+  "reuse_stage2": null,
+  "stage1_mode": "grid",
+  "stage1_engines": "v4",
+  "tile": 3000,
+  "overlap": 400,
+  "stage1_upscale": 1.0,
+  "stage1_rots": "0",
+  "max_side_len": 0,
+  "content_min_area": 300,
+  "close_kx": 25,
+  "close_ky": 9,
+  "region_max": 2000,
+  "region_grow": 60,
+  "stage2_engines": "v4,v6",
+  "glyph_min_h": 5,
+  "glyph_max_h": 28,
+  "glyph_min_w": 2,
+  "glyph_max_w": 24,
+  "glyph_min_area": 12,
+  "cluster_r": 20,
+  "cand_min_w": 8,
+  "cand_max_w": 120,
+  "cand_min_h": 6,
+  "mask_dark": 110,
+  "mask_light": 200,
+  "crop_pad": 14,
+  "min_crop_w": 48,
+  "min_crop_h": 32,
+  "stage2_upscale": 4,
+  "stage2_preprocess": "graycontrast",
+  "asm_gap": 12,
+  "asm_dh": 6,
+  "asm_maxfrag": 6,
+  "dedup_dist": 25,
+  "runs_dir": "projects/icom2200h/ocr_runs",
+  "out": "projects/icom2200h/ocr_runs/pcb_top_result.json",
+  "sheet": null,
+  "sheet_pad": 100,
+  "sheet_cell": 260,
+  "tag": "pcb_top_scan",
+  "note": "",
+  "only_refdes": false,
+  "keep_raw": true
+ },
+ "engine_versions": {
+  "rapidocr_onnxruntime": "1.4.4"
+ },
+ "engines": {
+  "stage1": {
+   "v4": "rapidocr-onnxruntime/PP-OCRv4-mobile"
+  },
+  "stage2": {
+   "v4": "rapidocr-onnxruntime/PP-OCRv4-mobile",
+   "v6": "rapidocr/PP-OCRv6-small"
+  }
+ },
+ "img": "/home/radio/radio-service-note/projects/icom2200h/render/pcb-top-300-1.png",
+ "note": "",
+ "time_s": 8.8,
+ "n_stage1": 14,
+ "n_stage2": 0,
+ "n_merged": 14,
+ "n_regions": 0,
+ "n_refdes": 3,
+ "n_agree": 0,
+ "hits": [
+  {
+   "text": "ANT",
+   "norm": "ANT",
+   "conf": 0.998,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    1839,
+    212
+   ],
+   "refdes_like": false
+  },
+  {
+   "text": "CHASSIS",
+   "norm": "CHASSIS",
+   "conf": 0.995,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    1980,
+    248
+   ],
+   "refdes_like": false
+  },
+  {
+   "text": "MP",
+   "norm": "MP",
+   "conf": 0.993,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    1019,
+    1350
+   ],
+   "refdes_like": false
+  },
+  {
+   "text": "C207",
+   "norm": "C207",
+   "conf": 0.992,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    641,
+    1010
+   ],
+   "refdes_like": true
+  },
+  {
+   "text": "EP12",
+   "norm": "EP12",
+   "conf": 0.987,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    671,
+    349
+   ],
+   "refdes_like": true
+  },
+  {
+   "text": "to the LOGIC unit J3",
+   "norm": "TOTHELOGICUNITJ3",
+   "conf": 0.976,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    1458,
+    1653
+   ],
+   "refdes_like": false
+  },
+  {
+   "text": "·TOPVIEW",
+   "norm": "TOPVIEW",
+   "conf": 0.975,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    195,
+    209
+   ],
+   "refdes_like": false
+  },
+  {
+   "text": "F13",
+   "norm": "F13",
+   "conf": 0.96,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    1647,
+    1160
+   ],
+   "refdes_like": true
+  },
+  {
+   "text": "9-2MAIN UNIT",
+   "norm": "92MAINUNIT",
+   "conf": 0.957,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    232,
+    180
+   ],
+   "refdes_like": false
+  },
+  {
+   "text": "B60768",
+   "norm": "B60768",
+   "conf": 0.941,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    716,
+    1399
+   ],
+   "refdes_like": false
+  },
+  {
+   "text": "$610",
+   "norm": "610",
+   "conf": 0.804,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    1708,
+    916
+   ],
+   "refdes_like": false
+  },
+  {
+   "text": "00",
+   "norm": "00",
+   "conf": 0.726,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    1549,
+    1131
+   ],
+   "refdes_like": false
+  },
+  {
+   "text": "000",
+   "norm": "000",
+   "conf": 0.613,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    1648,
+    1133
+   ],
+   "refdes_like": false
+  },
+  {
+   "text": "L un",
+   "norm": "LUN",
+   "conf": 0.585,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    1970,
+    265
+   ],
+   "refdes_like": false
+  }
+ ],
+ "raw_stage1": [
+  {
+   "text": "9-2MAIN UNIT",
+   "conf": 0.957,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    232,
+    180
+   ],
+   "box": [
+    [
+     134,
+     165
+    ],
+    [
+     331,
+     165
+    ],
+    [
+     331,
+     195
+    ],
+    [
+     134,
+     195
+    ]
+   ]
+  },
+  {
+   "text": "·TOPVIEW",
+   "conf": 0.975,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    195,
+    209
+   ],
+   "box": [
+    [
+     134,
+     197
+    ],
+    [
+     257,
+     197
+    ],
+    [
+     257,
+     222
+    ],
+    [
+     134,
+     222
+    ]
+   ]
+  },
+  {
+   "text": "ANT",
+   "conf": 0.998,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    1839,
+    212
+   ],
+   "box": [
+    [
+     1804,
+     200
+    ],
+    [
+     1873,
+     200
+    ],
+    [
+     1873,
+     225
+    ],
+    [
+     1804,
+     225
+    ]
+   ]
+  },
+  {
+   "text": "CHASSIS",
+   "conf": 0.995,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    1980,
+    248
+   ],
+   "box": [
+    [
+     1943,
+     237
+    ],
+    [
+     2018,
+     237
+    ],
+    [
+     2018,
+     259
+    ],
+    [
+     1943,
+     259
+    ]
+   ]
+  },
+  {
+   "text": "L un",
+   "conf": 0.585,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    1970,
+    265
+   ],
+   "box": [
+    [
+     1943,
+     254
+    ],
+    [
+     1997,
+     254
+    ],
+    [
+     1997,
+     277
+    ],
+    [
+     1943,
+     277
+    ]
+   ]
+  },
+  {
+   "text": "EP12",
+   "conf": 0.987,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    671,
+    349
+   ],
+   "box": [
+    [
+     650,
+     339
+    ],
+    [
+     693,
+     339
+    ],
+    [
+     693,
+     360
+    ],
+    [
+     650,
+     360
+    ]
+   ]
+  },
+  {
+   "text": "$610",
+   "conf": 0.804,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    1708,
+    916
+   ],
+   "box": [
+    [
+     1669,
+     903
+    ],
+    [
+     1747,
+     903
+    ],
+    [
+     1747,
+     930
+    ],
+    [
+     1669,
+     930
+    ]
+   ]
+  },
+  {
+   "text": "C207",
+   "conf": 0.992,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    641,
+    1010
+   ],
+   "box": [
+    [
+     613,
+     996
+    ],
+    [
+     669,
+     996
+    ],
+    [
+     669,
+     1024
+    ],
+    [
+     613,
+     1024
+    ]
+   ]
+  },
+  {
+   "text": "00",
+   "conf": 0.726,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    1549,
+    1131
+   ],
+   "box": [
+    [
+     1516,
+     1120
+    ],
+    [
+     1582,
+     1120
+    ],
+    [
+     1582,
+     1142
+    ],
+    [
+     1516,
+     1142
+    ]
+   ]
+  },
+  {
+   "text": "000",
+   "conf": 0.613,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    1648,
+    1133
+   ],
+   "box": [
+    [
+     1612,
+     1119
+    ],
+    [
+     1684,
+     1119
+    ],
+    [
+     1684,
+     1146
+    ],
+    [
+     1612,
+     1146
+    ]
+   ]
+  },
+  {
+   "text": "F13",
+   "conf": 0.96,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    1647,
+    1160
+   ],
+   "box": [
+    [
+     1628,
+     1149
+    ],
+    [
+     1666,
+     1149
+    ],
+    [
+     1666,
+     1170
+    ],
+    [
+     1628,
+     1170
+    ]
+   ]
+  },
+  {
+   "text": "MP",
+   "conf": 0.993,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    1019,
+    1350
+   ],
+   "box": [
+    [
+     1006,
+     1341
+    ],
+    [
+     1033,
+     1341
+    ],
+    [
+     1033,
+     1358
+    ],
+    [
+     1006,
+     1358
+    ]
+   ]
+  },
+  {
+   "text": "B60768",
+   "conf": 0.941,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    716,
+    1399
+   ],
+   "box": [
+    [
+     665,
+     1381
+    ],
+    [
+     768,
+     1381
+    ],
+    [
+     768,
+     1417
+    ],
+    [
+     665,
+     1417
+    ]
+   ]
+  },
+  {
+   "text": "to the LOGIC unit J3",
+   "conf": 0.976,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    1458,
+    1653
+   ],
+   "box": [
+    [
+     1380,
+     1641
+    ],
+    [
+     1537,
+     1641
+    ],
+    [
+     1537,
+     1665
+    ],
+    [
+     1380,
+     1665
+    ]
+   ]
+  }
+ ],
+ "raw_stage2": []
+}

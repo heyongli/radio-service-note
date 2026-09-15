@@ -1,0 +1,135 @@
+{
+  "description": "IC-2200H RX Signal Flow Waypoints",
+  "source": "components_index.json + chain_order_rx.json",
+  "dpi": 300,
+  "layers": {
+    "rx": {
+      "description": "RX signal path (confirmed)",
+      "color": "#00ff00",
+      "style": "solid",
+      "points": [
+        {
+          "refdes": "J11",
+          "label": "ANT Input",
+          "px": [
+            1279,
+            1489
+          ],
+          "status": "confirmed"
+        },
+        {
+          "refdes": "Q27",
+          "label": "RF-AMP",
+          "px": [
+            1200,
+            1180
+          ],
+          "status": "unverified"
+        },
+        {
+          "refdes": "IC4",
+          "label": "Mixer/IF",
+          "px": [
+            1800,
+            1500
+          ],
+          "status": "unverified"
+        },
+        {
+          "refdes": "F13",
+          "label": "IF Filter 1",
+          "px": [
+            1647,
+            1159
+          ],
+          "status": "unverified"
+        },
+        {
+          "refdes": "F14",
+          "label": "IF Filter 2",
+          "px": [
+            1700,
+            1450
+          ],
+          "status": "unverified"
+        },
+        {
+          "refdes": "Q26",
+          "label": "IF-AMP",
+          "px": [
+            1400,
+            1200
+          ],
+          "status": "unverified"
+        }
+      ]
+    },
+    "rx_aux": {
+      "description": "RX auxiliary paths (AGC, VCO, etc.)",
+      "color": "#88ff88",
+      "style": "dashed",
+      "points": [
+        {
+          "refdes": "D31",
+          "label": "AGC Diode",
+          "px": [
+            1400,
+            1550
+          ],
+          "status": "unverified"
+        },
+        {
+          "refdes": "IC5",
+          "label": "VCO",
+          "px": [
+            1900,
+            1600
+          ],
+          "status": "unverified"
+        },
+        {
+          "refdes": "D23",
+          "label": "Switch Diode",
+          "px": [
+            1300,
+            1500
+          ],
+          "status": "unverified"
+        }
+      ]
+    },
+    "notes": {
+      "description": "Component labels and notes",
+      "color": "#000000",
+      "points": [
+        {
+          "refdes": "C191",
+          "label": "C191",
+          "px": [
+            1812,
+            673
+          ],
+          "status": "confirmed"
+        },
+        {
+          "refdes": "R194",
+          "label": "R194 100k",
+          "px": [
+            1543,
+            1029
+          ],
+          "status": "confirmed"
+        },
+        {
+          "refdes": "R187",
+          "label": "R187",
+          "px": [
+            1461,
+            810
+          ],
+          "status": "confirmed"
+        }
+      ]
+    }
+  }
+}

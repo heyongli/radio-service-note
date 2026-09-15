@@ -1,0 +1,467 @@
+{
+  "phase": "fine",
+  "hits": [
+    {
+      "text": "Q26",
+      "norm": "Q26",
+      "conf": 0.993,
+      "engine": "v4",
+      "engines": [
+        "v4"
+      ],
+      "agree": false,
+      "stage": 1,
+      "px": [
+        82,
+        86
+      ],
+      "refdes_like": true,
+      "tile": "tile_r04_c04",
+      "src_file": "projects/icom2200h/render/pcb-bot-300-1.png",
+      "src_dpi": 300,
+      "src_crop": {
+        "x0": 890,
+        "y0": 740,
+        "x1": 1090,
+        "y1": 940
+      },
+      "src_px": [
+        972,
+        826
+      ],
+      "tool": "ai_refdes_ocr",
+      "tool_version": "0.2.0",
+      "preset": "full",
+      "run_id": "20260911_bot_fine"
+    },
+    {
+      "text": "R1091",
+      "norm": "R1091",
+      "conf": 0.76,
+      "engine": "v4",
+      "engines": [
+        "v4"
+      ],
+      "agree": false,
+      "stage": 1,
+      "px": [
+        71,
+        62
+      ],
+      "refdes_like": true,
+      "tile": "tile_r04_c04",
+      "src_file": "projects/icom2200h/render/pcb-bot-300-1.png",
+      "src_dpi": 300,
+      "src_crop": {
+        "x0": 890,
+        "y0": 740,
+        "x1": 1090,
+        "y1": 940
+      },
+      "src_px": [
+        961,
+        802
+      ],
+      "tool": "ai_refdes_ocr",
+      "tool_version": "0.2.0",
+      "preset": "full",
+      "run_id": "20260911_bot_fine"
+    },
+    {
+      "text": "IC6",
+      "norm": "IC6",
+      "conf": 0.685,
+      "engine": "v4",
+      "engines": [
+        "v4"
+      ],
+      "agree": false,
+      "stage": 1,
+      "px": [
+        36,
+        148
+      ],
+      "refdes_like": true,
+      "tile": "tile_r04_c04",
+      "src_file": "projects/icom2200h/render/pcb-bot-300-1.png",
+      "src_dpi": 300,
+      "src_crop": {
+        "x0": 890,
+        "y0": 740,
+        "x1": 1090,
+        "y1": 940
+      },
+      "src_px": [
+        926,
+        888
+      ],
+      "tool": "ai_refdes_ocr",
+      "tool_version": "0.2.0",
+      "preset": "full",
+      "run_id": "20260911_bot_fine"
+    },
+    {
+      "text": "R108",
+      "norm": "R108",
+      "conf": 0.855,
+      "engine": "v4",
+      "engines": [
+        "v4"
+      ],
+      "agree": false,
+      "stage": 1,
+      "px": [
+        158,
+        63
+      ],
+      "refdes_like": true,
+      "tile": "tile_r04_c03",
+      "src_file": "projects/icom2200h/render/pcb-bot-300-1.png",
+      "src_dpi": 300,
+      "src_crop": {
+        "x0": 730,
+        "y0": 740,
+        "x1": 930,
+        "y1": 940
+      },
+      "src_px": [
+        888,
+        803
+      ],
+      "tool": "ai_refdes_ocr",
+      "tool_version": "0.2.0",
+      "preset": "full",
+      "run_id": "20260911_bot_fine"
+    },
+    {
+      "text": "R10T",
+      "norm": "R10T",
+      "conf": 0.754,
+      "engine": "v4",
+      "engines": [
+        "v4"
+      ],
+      "agree": false,
+      "stage": 1,
+      "px": [
+        72,
+        192
+      ],
+      "refdes_like": true,
+      "tile": "tile_r03_c04",
+      "src_file": "projects/icom2200h/render/pcb-bot-300-1.png",
+      "src_dpi": 300,
+      "src_crop": {
+        "x0": 890,
+        "y0": 580,
+        "x1": 1090,
+        "y1": 780
+      },
+      "src_px": [
+        962,
+        772
+      ],
+      "tool": "ai_refdes_ocr",
+      "tool_version": "0.2.0",
+      "preset": "full",
+      "run_id": "20260911_bot_fine"
+    },
+    {
+      "text": "C1381",
+      "norm": "C1381",
+      "conf": 0.745,
+      "engine": "v4",
+      "engines": [
+        "v4"
+      ],
+      "agree": false,
+      "stage": 1,
+      "px": [
+        64,
+        132
+      ],
+      "refdes_like": true,
+      "tile": "tile_r05_c04",
+      "src_file": "projects/icom2200h/render/pcb-bot-300-1.png",
+      "src_dpi": 300,
+      "src_crop": {
+        "x0": 890,
+        "y0": 900,
+        "x1": 1090,
+        "y1": 1100
+      },
+      "src_px": [
+        954,
+        1032
+      ],
+      "tool": "ai_refdes_ocr",
+      "tool_version": "0.2.0",
+      "preset": "full",
+      "run_id": "20260911_bot_fine"
+    },
+    {
+      "text": "R1691",
+      "norm": "R1691",
+      "conf": 0.858,
+      "engine": "v4",
+      "engines": [
+        "v4"
+      ],
+      "agree": false,
+      "stage": 1,
+      "px": [
+        110,
+        192
+      ],
+      "refdes_like": true,
+      "tile": "tile_r05_c05",
+      "src_file": "projects/icom2200h/render/pcb-bot-300-1.png",
+      "src_dpi": 300,
+      "src_crop": {
+        "x0": 1050,
+        "y0": 900,
+        "x1": 1250,
+        "y1": 1100
+      },
+      "src_px": [
+        1160,
+        1092
+      ],
+      "tool": "ai_refdes_ocr",
+      "tool_version": "0.2.0",
+      "preset": "full",
+      "run_id": "20260911_bot_fine"
+    },
+    {
+      "text": "C88",
+      "norm": "C88",
+      "conf": 0.797,
+      "engine": "v4",
+      "engines": [
+        "v4"
+      ],
+      "agree": false,
+      "stage": 1,
+      "px": [
+        60,
+        152
+      ],
+      "refdes_like": true,
+      "tile": "tile_r05_c05",
+      "src_file": "projects/icom2200h/render/pcb-bot-300-1.png",
+      "src_dpi": 300,
+      "src_crop": {
+        "x0": 1050,
+        "y0": 900,
+        "x1": 1250,
+        "y1": 1100
+      },
+      "src_px": [
+        1110,
+        1052
+      ],
+      "tool": "ai_refdes_ocr",
+      "tool_version": "0.2.0",
+      "preset": "full",
+      "run_id": "20260911_bot_fine"
+    },
+    {
+      "text": "Q19",
+      "norm": "Q19",
+      "conf": 0.772,
+      "engine": "v4",
+      "engines": [
+        "v4"
+      ],
+      "agree": false,
+      "stage": 1,
+      "px": [
+        28,
+        146
+      ],
+      "refdes_like": true,
+      "tile": "tile_r05_c05",
+      "src_file": "projects/icom2200h/render/pcb-bot-300-1.png",
+      "src_dpi": 300,
+      "src_crop": {
+        "x0": 1050,
+        "y0": 900,
+        "x1": 1250,
+        "y1": 1100
+      },
+      "src_px": [
+        1078,
+        1046
+      ],
+      "tool": "ai_refdes_ocr",
+      "tool_version": "0.2.0",
+      "preset": "full",
+      "run_id": "20260911_bot_fine"
+    },
+    {
+      "text": "R51",
+      "norm": "R51",
+      "conf": 0.616,
+      "engine": "v4",
+      "engines": [
+        "v4"
+      ],
+      "agree": false,
+      "stage": 1,
+      "px": [
+        165,
+        189
+      ],
+      "refdes_like": true,
+      "tile": "tile_r05_c05",
+      "src_file": "projects/icom2200h/render/pcb-bot-300-1.png",
+      "src_dpi": 300,
+      "src_crop": {
+        "x0": 1050,
+        "y0": 900,
+        "x1": 1250,
+        "y1": 1100
+      },
+      "src_px": [
+        1215,
+        1089
+      ],
+      "tool": "ai_refdes_ocr",
+      "tool_version": "0.2.0",
+      "preset": "full",
+      "run_id": "20260911_bot_fine"
+    },
+    {
+      "text": "C209",
+      "norm": "C209",
+      "conf": 0.939,
+      "engine": "v4",
+      "engines": [
+        "v4"
+      ],
+      "agree": false,
+      "stage": 1,
+      "px": [
+        116,
+        144
+      ],
+      "refdes_like": true,
+      "tile": "tile_r04_c02",
+      "src_file": "projects/icom2200h/render/pcb-bot-300-1.png",
+      "src_dpi": 300,
+      "src_crop": {
+        "x0": 570,
+        "y0": 740,
+        "x1": 770,
+        "y1": 940
+      },
+      "src_px": [
+        686,
+        884
+      ],
+      "tool": "ai_refdes_ocr",
+      "tool_version": "0.2.0",
+      "preset": "full",
+      "run_id": "20260911_bot_fine"
+    },
+    {
+      "text": "C193",
+      "norm": "C193",
+      "conf": 0.804,
+      "engine": "v4",
+      "engines": [
+        "v4"
+      ],
+      "agree": false,
+      "stage": 1,
+      "px": [
+        101,
+        160
+      ],
+      "refdes_like": true,
+      "tile": "tile_r04_c02",
+      "src_file": "projects/icom2200h/render/pcb-bot-300-1.png",
+      "src_dpi": 300,
+      "src_crop": {
+        "x0": 570,
+        "y0": 740,
+        "x1": 770,
+        "y1": 940
+      },
+      "src_px": [
+        671,
+        900
+      ],
+      "tool": "ai_refdes_ocr",
+      "tool_version": "0.2.0",
+      "preset": "full",
+      "run_id": "20260911_bot_fine"
+    },
+    {
+      "text": "R169",
+      "norm": "R169",
+      "conf": 0.975,
+      "engine": "v4",
+      "engines": [
+        "v4"
+      ],
+      "agree": false,
+      "stage": 1,
+      "px": [
+        110,
+        32
+      ],
+      "refdes_like": true,
+      "tile": "tile_r06_c05",
+      "src_file": "projects/icom2200h/render/pcb-bot-300-1.png",
+      "src_dpi": 300,
+      "src_crop": {
+        "x0": 1050,
+        "y0": 1060,
+        "x1": 1250,
+        "y1": 1260
+      },
+      "src_px": [
+        1160,
+        1092
+      ],
+      "tool": "ai_refdes_ocr",
+      "tool_version": "0.2.0",
+      "preset": "full",
+      "run_id": "20260911_bot_fine"
+    },
+    {
+      "text": "Q4",
+      "norm": "Q4",
+      "conf": 0.795,
+      "engine": "v4",
+      "engines": [
+        "v4"
+      ],
+      "agree": false,
+      "stage": 1,
+      "px": [
+        43,
+        157
+      ],
+      "refdes_like": true,
+      "tile": "tile_r06_c05",
+      "src_file": "projects/icom2200h/render/pcb-bot-300-1.png",
+      "src_dpi": 300,
+      "src_crop": {
+        "x0": 1050,
+        "y0": 1060,
+        "x1": 1250,
+        "y1": 1260
+      },
+      "src_px": [
+        1093,
+        1217
+      ],
+      "tool": "ai_refdes_ocr",
+      "tool_version": "0.2.0",
+      "preset": "full",
+      "run_id": "20260911_bot_fine"
+    }
+  ]
+}

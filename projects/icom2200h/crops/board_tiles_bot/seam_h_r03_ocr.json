@@ -1,0 +1,520 @@
+{
+ "run_id": "20260914_122420_seam_h_r03_v0.2.0_92b863433b06.json",
+ "tool_version": "0.2.0",
+ "tool_script_sha1": "92b863433b06",
+ "date": "2026-09-14T12:24:20",
+ "params": {
+  "img": "projects/icom2200h/crops/board_tiles_bot/seam_h_r03.png",
+  "img_dpi": 300,
+  "out_dpi": 300,
+  "img_low": null,
+  "preset": "full",
+  "stages": "1,2",
+  "reuse_stage1": null,
+  "reuse_stage2": null,
+  "stage1_mode": "grid",
+  "stage1_engines": "v4",
+  "tile": 3000,
+  "overlap": 400,
+  "stage1_upscale": 1.0,
+  "stage1_rots": "0",
+  "max_side_len": 0,
+  "content_min_area": 300,
+  "close_kx": 25,
+  "close_ky": 9,
+  "region_max": 2000,
+  "region_grow": 60,
+  "stage2_engines": "v4,v6",
+  "glyph_min_h": 5,
+  "glyph_max_h": 28,
+  "glyph_min_w": 2,
+  "glyph_max_w": 24,
+  "glyph_min_area": 12,
+  "cluster_r": 20,
+  "cand_min_w": 8,
+  "cand_max_w": 120,
+  "cand_min_h": 6,
+  "mask_dark": 110,
+  "mask_light": 200,
+  "crop_pad": 14,
+  "min_crop_w": 48,
+  "min_crop_h": 32,
+  "stage2_upscale": 4,
+  "stage2_preprocess": "graycontrast",
+  "asm_gap": 12,
+  "asm_dh": 6,
+  "asm_maxfrag": 6,
+  "dedup_dist": 25,
+  "runs_dir": "projects/icom2200h/crops/board_tiles_bot/runs",
+  "out": "projects/icom2200h/crops/board_tiles_bot/seam_h_r03_ocr.json",
+  "sheet": null,
+  "sheet_pad": 100,
+  "sheet_cell": 260,
+  "tag": "seam_h_r03",
+  "note": "",
+  "only_refdes": true,
+  "keep_raw": true
+ },
+ "engine_versions": {
+  "rapidocr_onnxruntime": "1.4.4"
+ },
+ "engines": {
+  "stage1": {
+   "v4": "rapidocr-onnxruntime/PP-OCRv4-mobile"
+  },
+  "stage2": {
+   "v4": "rapidocr-onnxruntime/PP-OCRv4-mobile",
+   "v6": "rapidocr/PP-OCRv6-small"
+  }
+ },
+ "img": "/home/radio/radio-service-note/projects/icom2200h/crops/board_tiles_bot/seam_h_r03.png",
+ "note": "",
+ "time_s": 3.8,
+ "n_stage1": 11,
+ "n_stage2": 0,
+ "n_merged": 8,
+ "n_regions": 0,
+ "n_refdes": 8,
+ "n_agree": 0,
+ "hits": [
+  {
+   "text": "Q28",
+   "norm": "Q28",
+   "conf": 0.938,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    1550,
+    18
+   ],
+   "refdes_like": true
+  },
+  {
+   "text": "C163",
+   "norm": "C163",
+   "conf": 0.894,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    638,
+    47
+   ],
+   "refdes_like": true
+  },
+  {
+   "text": "[R108",
+   "norm": "R108",
+   "conf": 0.868,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    638,
+    64
+   ],
+   "refdes_like": true
+  },
+  {
+   "text": "C288",
+   "norm": "C288",
+   "conf": 0.847,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    716,
+    46
+   ],
+   "refdes_like": true
+  },
+  {
+   "text": "R179",
+   "norm": "R179",
+   "conf": 0.818,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    1276,
+    46
+   ],
+   "refdes_like": true
+  },
+  {
+   "text": "R10T",
+   "norm": "R10T",
+   "conf": 0.683,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    714,
+    32
+   ],
+   "refdes_like": true
+  },
+  {
+   "text": "C17a",
+   "norm": "C17A",
+   "conf": 0.669,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    1480,
+    42
+   ],
+   "refdes_like": true
+  },
+  {
+   "text": "R109]",
+   "norm": "R109",
+   "conf": 0.588,
+   "engine": "v4",
+   "engines": [
+    "v4"
+   ],
+   "agree": false,
+   "stage": 1,
+   "px": [
+    712,
+    62
+   ],
+   "refdes_like": true
+  }
+ ],
+ "raw_stage1": [
+  {
+   "text": "U",
+   "conf": 0.763,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    558,
+    31
+   ],
+   "box": [
+    [
+     540,
+     2
+    ],
+    [
+     579,
+     4
+    ],
+    [
+     577,
+     59
+    ],
+    [
+     538,
+     58
+    ]
+   ]
+  },
+  {
+   "text": "[0291]",
+   "conf": 0.721,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    716,
+    16
+   ],
+   "box": [
+    [
+     704,
+     10
+    ],
+    [
+     728,
+     10
+    ],
+    [
+     728,
+     23
+    ],
+    [
+     704,
+     23
+    ]
+   ]
+  },
+  {
+   "text": "R1mC",
+   "conf": 0.815,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    1278,
+    28
+   ],
+   "box": [
+    [
+     1263,
+     19
+    ],
+    [
+     1293,
+     19
+    ],
+    [
+     1293,
+     36
+    ],
+    [
+     1263,
+     36
+    ]
+   ]
+  },
+  {
+   "text": "Q28",
+   "conf": 0.938,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    1550,
+    18
+   ],
+   "box": [
+    [
+     1541,
+     11
+    ],
+    [
+     1559,
+     11
+    ],
+    [
+     1559,
+     25
+    ],
+    [
+     1541,
+     25
+    ]
+   ]
+  },
+  {
+   "text": "R10T",
+   "conf": 0.683,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    714,
+    32
+   ],
+   "box": [
+    [
+     701,
+     24
+    ],
+    [
+     728,
+     24
+    ],
+    [
+     728,
+     39
+    ],
+    [
+     701,
+     39
+    ]
+   ]
+  },
+  {
+   "text": "C163",
+   "conf": 0.894,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    638,
+    47
+   ],
+   "box": [
+    [
+     625,
+     41
+    ],
+    [
+     649,
+     40
+    ],
+    [
+     650,
+     53
+    ],
+    [
+     626,
+     55
+    ]
+   ]
+  },
+  {
+   "text": "C288",
+   "conf": 0.847,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    716,
+    46
+   ],
+   "box": [
+    [
+     704,
+     39
+    ],
+    [
+     728,
+     39
+    ],
+    [
+     728,
+     52
+    ],
+    [
+     704,
+     52
+    ]
+   ]
+  },
+  {
+   "text": "R179",
+   "conf": 0.818,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    1276,
+    46
+   ],
+   "box": [
+    [
+     1263,
+     38
+    ],
+    [
+     1289,
+     38
+    ],
+    [
+     1289,
+     54
+    ],
+    [
+     1263,
+     54
+    ]
+   ]
+  },
+  {
+   "text": "C17a",
+   "conf": 0.669,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    1480,
+    42
+   ],
+   "box": [
+    [
+     1465,
+     35
+    ],
+    [
+     1493,
+     33
+    ],
+    [
+     1494,
+     49
+    ],
+    [
+     1466,
+     50
+    ]
+   ]
+  },
+  {
+   "text": "[R108",
+   "conf": 0.868,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    638,
+    64
+   ],
+   "box": [
+    [
+     626,
+     57
+    ],
+    [
+     650,
+     57
+    ],
+    [
+     650,
+     70
+    ],
+    [
+     626,
+     70
+    ]
+   ]
+  },
+  {
+   "text": "R109]",
+   "conf": 0.588,
+   "engine": "v4",
+   "stage": 1,
+   "px": [
+    712,
+    62
+   ],
+   "box": [
+    [
+     699,
+     54
+    ],
+    [
+     724,
+     54
+    ],
+    [
+     724,
+     69
+    ],
+    [
+     699,
+     69
+    ]
+   ]
+  }
+ ],
+ "raw_stage2": []
+}

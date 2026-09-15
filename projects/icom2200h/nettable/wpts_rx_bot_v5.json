@@ -1,0 +1,118 @@
+[
+  {
+    "layer": "ctrl",
+    "kind": "rect",
+    "px": [926, 888],
+    "w": 200,
+    "h": 140,
+    "label": "IC6",
+    "dot": false,
+    "dash": true
+  },
+  {
+    "layer": "ctrl",
+    "kind": "rect",
+    "px": [972, 825],
+    "w": 160,
+    "h": 120,
+    "label": "Q26",
+    "dot": false,
+    "dash": true
+  },
+  {
+    "layer": "ctrl",
+    "kind": "rect",
+    "px": [772, 1160],
+    "w": 140,
+    "h": 110,
+    "label": "Q16",
+    "dot": false,
+    "dash": true
+  },
+  {
+    "layer": "ctrl",
+    "kind": "rect",
+    "px": [1800, 900],
+    "w": 140,
+    "h": 110,
+    "label": "IC7",
+    "dot": false,
+    "dash": true
+  },
+  {
+    "layer": "ctrl",
+    "kind": "rect",
+    "px": [1800, 757],
+    "w": 140,
+    "h": 110,
+    "label": "Q28",
+    "dot": false,
+    "dash": true
+  },
+  {
+    "layer": "marks",
+    "px": [926, 888],
+    "label": "IC6 VCO",
+    "dot": true,
+    "fs": 26,
+    "lpos": "ur",
+    "note": "VCO/PLL local osc for mixer"
+  },
+  {
+    "layer": "marks",
+    "px": [972, 825],
+    "label": "Q26",
+    "dot": true,
+    "fs": 24,
+    "lpos": "ul",
+    "note": ""
+  },
+  {
+    "layer": "marks",
+    "px": [772, 1160],
+    "label": "Q16 IF-AMP",
+    "dot": true,
+    "fs": 24,
+    "lpos": "ur",
+    "note": "IF amplifier"
+  },
+  {
+    "layer": "marks",
+    "px": [1800, 900],
+    "label": "IC7",
+    "dot": true,
+    "fs": 22,
+    "lpos": "ur",
+    "note": ""
+  },
+  {
+    "layer": "marks",
+    "px": [1800, 757],
+    "label": "Q28",
+    "dot": true,
+    "fs": 22,
+    "lpos": "ur",
+    "note": ""
+  },
+  {
+    "layer": "notes",
+    "px": [40, 80],
+    "label": "RX Chain Components - IC-2200H PCB BOT (v5.0)",
+    "dot": false,
+    "fs": 28
+  },
+  {
+    "layer": "notes",
+    "px": [40, 120],
+    "label": "Teal = OCR-confirmed on back side (double-engine v4+v5)",
+    "dot": false,
+    "fs": 18
+  },
+  {
+    "layer": "notes",
+    "px": [40, 150],
+    "label": "Q16 IF-AMP found: 772,1160 conf=0.93 (v5s)",
+    "dot": false,
+    "fs": 18
+  }
+]

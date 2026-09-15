@@ -1,0 +1,78 @@
+{
+  "version": "1.0",
+  "created": "2026-09-11",
+  "source_image": "projects/icom2200h/render/pcb-top-300-1.png",
+  "dpi": 300,
+  "image_size": [
+    2550,
+    3300
+  ],
+  "crops": [
+    {
+      "name": "J11_ANT_connector",
+      "cx": 1279,
+      "cy": 1489,
+      "radius": 80
+    },
+    {
+      "name": "F13_FL363_filter",
+      "cx": 1647,
+      "cy": 1159,
+      "radius": 60
+    },
+    {
+      "name": "D12_diode",
+      "cx": 1726,
+      "cy": 709,
+      "radius": 40
+    },
+    {
+      "name": "C118_capacitor",
+      "cx": 1289,
+      "cy": 708,
+      "radius": 40
+    },
+    {
+      "name": "Q27_RF_amp_area",
+      "cx": 1200,
+      "cy": 1180,
+      "radius": 80
+    },
+    {
+      "name": "Q16_IF_amp_area",
+      "cx": 1000,
+      "cy": 1000,
+      "radius": 80
+    },
+    {
+      "name": "Q26_IF_amp_area",
+      "cx": 1400,
+      "cy": 1200,
+      "radius": 80
+    },
+    {
+      "name": "IC4_mixer_area",
+      "cx": 1800,
+      "cy": 1500,
+      "radius": 80
+    },
+    {
+      "name": "F14_filter_area",
+      "cx": 1700,
+      "cy": 1450,
+      "radius": 60
+    },
+    {
+      "name": "IC12_AF_preamp_area",
+      "cx": 1160,
+      "cy": 1549,
+      "radius": 80
+    },
+    {
+      "name": "IC6_VCO_area",
+      "cx": 1856,
+      "cy": 362,
+      "radius": 60
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+[32m[INFO] 2026-09-14 22:24:11,116 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+2026-09-14 22:24:11,116 - RapidOCR - INFO: Using engine_name: onnxruntime
+[32m[INFO] 2026-09-14 22:24:11,338 [RapidOCR] download_file.py:60: File exists and is valid: C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\ch_PP-OCRv5_det_server.onnx[0m
+2026-09-14 22:24:11,338 - RapidOCR - INFO: File exists and is valid: C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\ch_PP-OCRv5_det_server.onnx
+[32m[INFO] 2026-09-14 22:24:11,338 [RapidOCR] main.py:63: Using C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\ch_PP-OCRv5_det_server.onnx[0m
+2026-09-14 22:24:11,338 - RapidOCR - INFO: Using C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\ch_PP-OCRv5_det_server.onnx
+[32m[INFO] 2026-09-14 22:24:11,972 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+2026-09-14 22:24:11,972 - RapidOCR - INFO: Using engine_name: onnxruntime
+[32m[INFO] 2026-09-14 22:24:11,977 [RapidOCR] download_file.py:60: File exists and is valid: C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx[0m
+2026-09-14 22:24:11,977 - RapidOCR - INFO: File exists and is valid: C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx
+[32m[INFO] 2026-09-14 22:24:11,977 [RapidOCR] main.py:63: Using C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx[0m
+2026-09-14 22:24:11,977 - RapidOCR - INFO: Using C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx
+[32m[INFO] 2026-09-14 22:24:12,057 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+2026-09-14 22:24:12,057 - RapidOCR - INFO: Using engine_name: onnxruntime
+[32m[INFO] 2026-09-14 22:24:12,281 [RapidOCR] download_file.py:60: File exists and is valid: C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\ch_PP-OCRv5_rec_server.onnx[0m
+2026-09-14 22:24:12,281 - RapidOCR - INFO: File exists and is valid: C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\ch_PP-OCRv5_rec_server.onnx
+[32m[INFO] 2026-09-14 22:24:12,282 [RapidOCR] main.py:63: Using C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\ch_PP-OCRv5_rec_server.onnx[0m
+2026-09-14 22:24:12,282 - RapidOCR - INFO: Using C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\ch_PP-OCRv5_rec_server.onnx
+[32m[INFO] 2026-09-14 22:24:13,321 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+2026-09-14 22:24:13,321 - RapidOCR - INFO: Using engine_name: onnxruntime
+[32m[INFO] 2026-09-14 22:24:13,347 [RapidOCR] download_file.py:60: File exists and is valid: C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\PP-OCRv6_det_small.onnx[0m
+2026-09-14 22:24:13,347 - RapidOCR - INFO: File exists and is valid: C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\PP-OCRv6_det_small.onnx
+[32m[INFO] 2026-09-14 22:24:13,348 [RapidOCR] main.py:63: Using C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\PP-OCRv6_det_small.onnx[0m
+2026-09-14 22:24:13,348 - RapidOCR - INFO: Using C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\PP-OCRv6_det_small.onnx
+[32m[INFO] 2026-09-14 22:24:13,534 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+2026-09-14 22:24:13,534 - RapidOCR - INFO: Using engine_name: onnxruntime
+[32m[INFO] 2026-09-14 22:24:13,538 [RapidOCR] download_file.py:60: File exists and is valid: C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx[0m
+2026-09-14 22:24:13,538 - RapidOCR - INFO: File exists and is valid: C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx
+[32m[INFO] 2026-09-14 22:24:13,538 [RapidOCR] main.py:63: Using C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx[0m
+2026-09-14 22:24:13,538 - RapidOCR - INFO: Using C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx
+[32m[INFO] 2026-09-14 22:24:13,608 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+2026-09-14 22:24:13,608 - RapidOCR - INFO: Using engine_name: onnxruntime
+[32m[INFO] 2026-09-14 22:24:13,664 [RapidOCR] download_file.py:60: File exists and is valid: C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\PP-OCRv6_rec_small.onnx[0m
+2026-09-14 22:24:13,664 - RapidOCR - INFO: File exists and is valid: C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\PP-OCRv6_rec_small.onnx
+[32m[INFO] 2026-09-14 22:24:13,665 [RapidOCR] main.py:63: Using C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\PP-OCRv6_rec_small.onnx[0m
+2026-09-14 22:24:13,665 - RapidOCR - INFO: Using C:\Users\radio\ocr_gpu_venv\Lib\site-packages\rapidocr\models\PP-OCRv6_rec_small.onnx
+[stage1] 2/120 ( 1.7%) elapsed     8s ETA   452s tile-avg  3.8s hits=7
