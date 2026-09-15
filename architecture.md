@@ -313,3 +313,52 @@ PCB 渲染图 ──AI OCR 两阶段管线──> ai_ocr_runs/(每次运行 JSON
 3. **视觉签收兜底**: 高倍 crop 拼图签(--sheet)人工过一遍——AI 时代
    这道闸不是流程残留, 是 2026-09-10 纠出 5 处旧错误的直接功臣(反向:
    AI 也纠了人工确认的错, 双向不信任才是信任)。
+
+## 8. 目录约定变更日志
+
+记录项目目录结构的关键变更与原因, 便于回溯:
+
+### 2026-09-15 — 第 0 章目录规范建立 + 全面清理
+
+**触发**: 用户指出 ocr_runs/annot/ 结构错误, 根目录与项目目录散落文件重复。
+
+**变更**:
+- **删除**:
+  - `projects/icom2200h/scan/` (无文档登记, 仅历史调试截图 14MB)
+  - `projects/icom2200h/archive/` (空目录)
+- **svg_runs/ 提升**: `projects/<机型>/annot/svg_runs/` → `projects/<机型>/svg_runs/`
+  - 原因: annot/ 严禁子目录(仅最终 SVG+PNG); svg_runs/ 与 annot/ 平级
+- **ocr_runs/ 提升**: `projects/<机型>/nettable/ai_ocr_runs/` →
+  `projects/<机型>/ocr_runs/`
+  - 原因: ocr_runs 严禁 annot/crops/svg_runs 子目录; ai_ocr_runs 独立为项目级 ocr 归档
+- **新规则**:
+  - `annot/` 仅放最终 `*.svg` `*.png`(给人看/存档)
+  - `crops/` 仅存图片切割/索引
+  - `nettable/` 仅存结构化 JSON
+  - `ocr_runs/` 仅 OCR 归档
+  - 根目录、项目根目录不留散落文件
+- **配套更新**:
+  - `agent.md` — 项目目录约定行重写, 删除 scan/archive, 改为 crops/ocr_runs/svg_runs
+  - `best_practices.md` — 同步新约定, 删除 `scan/annot/svg_runs` 旧表述
+  - `tools/annotate_svg_flow/annotate_svg_flow.py` — `--runs-dir` 默认放项目根 `svg_runs/`
+  - `tools/annotate_svg_flow/README.md` — 示例路径更新
+
+**新工具**: `tools/render_rx_flow.py` 取代旧的 `add_photo_wpts.py`(单工具),
+同时输出 PNG(PIL) + SVG(svgwrite, 底图 base64 内嵌)。带箭头信号方向,
+实线=已确认绿/虚线=未定位, 可配置跳过非关键器件(EP11/EP12)。
+
+### 2026-09-15 — render/ 标注来源
+
+**变更**: 在第 0 章注明 `render/*.png` 由 `pdftoppm -r <dpi> -png <同名.pdf>` 导出。
+避免后续误把 `render/` 视为源图来源, 真正的源是 `*.pdf`。
+
+### 2026-09-11 — nettable/ai_ocr_runs/ 创建
+
+**变更**: 在 `projects/<机型>/nettable/` 下创建 `ai_ocr_runs/` 子目录。
+
+**2026-09-15 撤销**: 见上文"ocr_runs/ 提升"。
+
+### 2026-09-10 — 旧约定"extract 目录"废弃
+
+**变更**: agent.md 明确禁止新建/混入 `extract/`, 中间文件按类型分目录。
+
