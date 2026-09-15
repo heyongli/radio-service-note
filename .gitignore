@@ -1,2 +1,28 @@
-__pycache__
-*.pdf
+# projects/ 不进 git(中间产物, OCR 归档, 渲染图等)
+projects/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+
+# 编辑器/系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.log
+*.bak
+
+# 模型/缓存
+*.onnx
+*.pt
+*.pth
+*.cache/
