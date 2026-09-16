@@ -271,6 +271,7 @@ def build_wpts(results, coords, components):
             mark["outline_cy"] = c.get("outline_cy", px[1])
             mark["outline_w"] = c.get("outline_w", 220)
             mark["outline_h"] = c.get("outline_h", 160)
+            mark["outline_stroke"] = c.get("outline_stroke", 3)
         items.append(mark)
 
     return items

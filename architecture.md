@@ -134,6 +134,14 @@ pcb_x = crop_local_x + cx0
 pcb_y = crop_local_y + cy0
 ```
 
+**旋转修正 (必读)**: 若 OCR 前 crop 被旋转 (rot=90/270), OCR box 坐标在旋转后
+坐标系, 必须**先逆旋转**再加 crop 原点:
+```
+rot=90:  ox = ry,        oy = Hc - 1 - rx     (Hc = 原始 crop 高度)
+rot=270: ox = Wc - 1 - ry, oy = rx            (Wc = 原始 crop 宽度)
+```
+未逆旋转会导致坐标系统性偏移 (曾影响 345 处, 见 §13.1)。
+
 ### 2c. dpi 比例映射: 禁止坐标直接相加
 
 **核心规则**: 不同 DPI 空间的坐标之间**只能做比例映射**, **不能直接相加**。
@@ -425,6 +433,20 @@ tools/<tool_name>/
 **detect_ic.py crop-ocr (IC 本体定位首选)**: 配合 rectangle/circle_locator 的裁切,
 旋转 OCR 读到已知 refdes 的裁切 bbox 即 IC 本体。默认用预计算 DML OCR 结果,
 `--local-ocr` 兜底。**本体中心 ≠ 标签文字中心**, 轮廓框必须用本体 bbox。
+命中必须**精确裁切验证** (沿 bbox 裁切源图再 OCR, 只有该 refdes 才算真命中),
+否则 padding 里的邻近文字会造成假匹配。
+
+**旋转 OCR 坐标转换 (关键, 2026-09-16 修复)**: 任何"先旋转再 OCR"的管线,
+OCR box 坐标在**旋转后坐标系**, 必须**逆旋转**回原始 crop 坐标再加 crop 原点,
+否则 rot=90/270 坐标系统性偏移:
+```
+rot=0:   ox = rx,        oy = ry
+rot=90:  ox = ry,        oy = Hc - 1 - rx     (Hc = 原始 crop 高度)
+rot=270: ox = Wc - 1 - ry, oy = rx            (Wc = 原始 crop 宽度)
+```
+已固化在 `ic_ocr_scan.py` + `ic_ocr_scan_dml.py` 的 `ocr_crop`。
+曾导致 components_index 345 处 rot≠0 坐标偏移 (如 IC12 从错误的 (3555,2719)
+校正到正确的 (3429,2768))。任何"变换后再识别"的中间结果, box 必须逆变换回源空间。
 
 ### 13.2 信号流渲染
 | 工具 | 路径 | 用途 |

@@ -253,6 +253,7 @@ def render_png(wpts, base, comp_idx, args):
                     ocy = item.get("outline_cy", y)
                     ow = item.get("outline_w", 220)
                     oh = item.get("outline_h", 160)
+                    osw = item.get("outline_stroke", 3)
                     other_side = item.get("outline_view", "top") == "bot"
                     ocolor = C['purple'] if other_side else C['red']
                     rect = [ocx - ow/2, ocy - oh/2, ocx + ow/2, ocy + oh/2]
@@ -261,9 +262,9 @@ def render_png(wpts, base, comp_idx, args):
                         pts = [(rect[0], rect[1]), (rect[2], rect[1]),
                                (rect[2], rect[3]), (rect[0], rect[3]), (rect[0], rect[1])]
                         for i in range(len(pts) - 1):
-                            draw_dashed_line(draw, pts[i], pts[i+1], ocolor, width=5)
+                            draw_dashed_line(draw, pts[i], pts[i+1], ocolor, width=max(3, osw))
                     else:
-                        draw.rectangle(rect, outline=ocolor, width=5)
+                        draw.rectangle(rect, outline=ocolor, width=osw)
                 if mark_type == "via":
                     # Cross-side destination: red hollow circle (via), thick outline
                     r = 18
@@ -447,6 +448,7 @@ def generate_svg(wpts, out_svg, width, height, pcb_img_path, comp_idx, args):
             lpos = item.get("lpos", "")
             note = item.get("note", "")
             inferred = label.endswith("?") or item.get("inferred", False)
+            mark_type = item.get("mark_type", "")
             anchor = {"u": "middle", "d": "middle", "l": "end", "r": "start",
                       "ul": "end", "ur": "start", "dr": "start"}.get(lpos, "start")
             if px:
@@ -454,7 +456,29 @@ def generate_svg(wpts, out_svg, width, height, pcb_img_path, comp_idx, args):
                 safe_id = "".join(c if c.isalnum() else "-" for c in ref)[:24] if False else "".join(
                     c if c.isalnum() else "-" for c in label)[:24]
                 g = dwg.g(id=f"mark-{safe_id}", filter="url(#halo)")
-                if dot:
+                # IC outline: 另一面用虚线
+                if item.get("outline"):
+                    ocx = item.get("outline_cx", x)
+                    ocy = item.get("outline_cy", y)
+                    ow = item.get("outline_w", 220)
+                    oh = item.get("outline_h", 160)
+                    osw = item.get("outline_stroke", 3)
+                    other_side = item.get("outline_view", "top") == "bot"
+                    ocolor = SC['purple'] if other_side else SC['red']
+                    x1, y1, x2, y2 = ocx - ow/2, ocy - oh/2, ocx + ow/2, ocy + oh/2
+                    if other_side:
+                        d = ("M%d,%d H%d V%d H%d Z" % (x1, y1, x2, y2, x1))
+                        g.add(dwg.path(d=d, fill="none", stroke=ocolor,
+                                       stroke_width=osw, stroke_dasharray="14,8"))
+                    else:
+                        g.add(dwg.rect(insert=(x1, y1), size=(ow, oh), fill="none",
+                                       stroke=ocolor, stroke_width=osw))
+                if mark_type == "via":
+                    # Cross-side destination: red hollow circle (via)
+                    r = 18
+                    g.add(dwg.circle(center=(x, y), r=r,
+                                     fill=SC['white'], stroke=SC['red'], stroke_width=6))
+                elif dot:
                     if inferred:
                         # Bot component: via icon (circle with cross)
                         r = 16
