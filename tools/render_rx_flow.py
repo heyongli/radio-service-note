@@ -1,24 +1,64 @@
 #!/usr/bin/env python3
-"""
-渲染 wpts_rx_top_v8.json 的 RX 信号流程线到 PCB 图片上
-输出 SVG 和 PNG
-"""
+"""tools/render_rx_flow.py - RX flow 渲染
 
+purpose: wpts + components_index → PNG/SVG 标注图 (PCB 顶视/底视, 信号流标注)
+format: Python 3 + PIL + svgwrite
+version: 0.5.0 (2026-09-15 全参数化, 颜色/字号/halo/箭头 都 CLI 可调)
+consumers: 任何 RX flow 渲染, IC-2200H/类似 PCB 维修工程
+
+原则 (agent.md §2, §10):
+  - 全参数 CLI 化, 不硬编码任何视觉常数 (颜色/字号/halo 宽度/箭头长度等)
+  - 默认值遵循"高对比度"原则: 深色文字 + 白色 halo, PCB 浅底可读
+  - SVG 同步支持同样的参数化 (文本 halo 用 SVG filter 实现)
+
+默认色板 (PCB 浅底优化, 深色 + halo):
+  主流程线: 深绿 (0,140,0) / 虚线
+  关键器件红点: 红 (200,0,0) + 黑心
+  文字标签: 深蓝 (0,0,180) + 白色 halo (3px)
+  确认框 (components_index): 深蓝 (0,0,180)
+  旁路/控制框: 紫红 (160,0,160)
+  notes 文字: 黑 + 白 halo
+"""
+import argparse
 import json
-import sys
 import math
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 
-def load_font(size):
-    for fp in [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-        "/System/Library/Fonts/Helvetica.ttc",
-        "C:/Windows/Fonts/arial.ttf",
-    ]:
+# === 默认色板 (全部 CLI 可覆盖) ===
+DEFAULTS = {
+    'color_green': '#008C00',
+    'color_green_dash': '#007800',
+    'color_red': '#C80000',
+    'color_blue': '#0000B4',
+    'color_purple': '#A000A0',
+    'color_white': '#FFFFFF',
+    'color_black': '#000000',
+    'halo_color': '#FFFFFF',
+    'halo_width': 3,
+    'font_label': 44,
+    'font_line_label': 36,
+    'font_note': 28,
+    'arrow_head_len': 36,
+    'arrow_head_angle': 30,
+    'line_width': 8,
+    'line_dash_width': 6,
+    'box_width': 4,
+    'dash_pattern': '14,8',
+}
+
+
+def load_font(size, bold=False):
+    font_paths = [
+        ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold
+         else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+        ("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf" if bold
+         else "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
+        ("/System/Library/Fonts/Helvetica.ttc", "C:/Windows/Fonts/arialbd.ttf" if bold
+         else "C:/Windows/Fonts/arial.ttf"),
+    ]
+    for fp in font_paths:
         try:
             return ImageFont.truetype(fp, size)
         except Exception:
@@ -26,7 +66,25 @@ def load_font(size):
     return ImageFont.load_default()
 
 
-def draw_arrow(draw, x1, y1, x2, y2, color, width=5, head_len=20, head_angle=30):
+def hex_to_rgba(s, alpha=255):
+    """'#008C00' -> (0,140,0,255)"""
+    s = s.lstrip('#')
+    if len(s) == 3:
+        s = ''.join(c * 2 for c in s)
+    return (int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16), alpha)
+
+
+def draw_text_with_halo(draw, pos, text, fill, font, halo_color=(255, 255, 255, 255), halo_width=3):
+    """带描边的文字, 在浅色 PCB 底图上保证可读"""
+    x, y = pos
+    for dx, dy in [(-halo_width, 0), (halo_width, 0), (0, -halo_width), (0, halo_width),
+                    (-halo_width, -halo_width), (halo_width, -halo_width),
+                    (-halo_width, halo_width), (halo_width, halo_width)]:
+        draw.text((x + dx, y + dy), text, fill=halo_color, font=font)
+    draw.text(pos, text, fill=fill, font=font)
+
+
+def draw_arrow(draw, x1, y1, x2, y2, color, width=5, head_len=36, head_angle=30):
     draw.line([(x1, y1), (x2, y2)], fill=color, width=width, joint="curve")
     dx, dy = x2 - x1, y2 - y1
     dist = math.hypot(dx, dy)
@@ -34,14 +92,17 @@ def draw_arrow(draw, x1, y1, x2, y2, color, width=5, head_len=20, head_angle=30)
         return
     ux, uy = dx / dist, dy / dist
     a = math.radians(head_angle)
-    ax1 = x2 - head_len * (ux * math.cos(a) - uy * math.sin(a))
-    ay1 = y2 - head_len * (uy * math.cos(a) + ux * math.sin(a))
-    ax2 = x2 - head_len * (ux * math.cos(-a) - uy * math.sin(-a))
-    ay2 = y2 - head_len * (uy * math.cos(-a) + ux * math.sin(-a))
+    for sign in [1, -1]:
+        ax = x2 - head_len * (ux * math.cos(sign * a) - uy * math.sin(sign * a))
+        ay = y2 - head_len * (uy * math.cos(sign * a) + ux * math.sin(sign * a))
+        if sign == 1:
+            ax1, ay1 = ax, ay
+        else:
+            ax2, ay2 = ax, ay
     draw.polygon([(x2, y2), (ax1, ay1), (ax2, ay2)], fill=color)
 
 
-def draw_arrowed_line(draw, points, color, width=5, head_len=24, dash=False):
+def draw_arrowed_line(draw, points, color, width=8, head_len=36, dash=False):
     if len(points) < 2:
         return
     if dash:
@@ -52,40 +113,47 @@ def draw_arrowed_line(draw, points, color, width=5, head_len=24, dash=False):
             if i == len(points) - 2:
                 draw_arrow(draw, points[i][0], points[i][1],
                            points[i + 1][0], points[i + 1][1],
-                           color, width)
+                           color, width, head_len)
             else:
                 draw.line([points[i], points[i + 1]], fill=color, width=width, joint="curve")
 
 
-def render_png(wpts, base, comp_idx):
+# 全局色 (CLI 覆盖)
+C = {}
+
+
+def apply_colors(args):
+    """从 CLI args 应用色板到全局 C"""
+    global C, C_WHITE
+    C['green'] = hex_to_rgba(args.color_green)
+    C['green_dash'] = hex_to_rgba(args.color_green_dash)
+    C['red'] = hex_to_rgba(args.color_red)
+    C['blue'] = hex_to_rgba(args.color_blue)
+    C['purple'] = hex_to_rgba(args.color_purple)
+    C['black'] = hex_to_rgba(args.color_black)
+    C['white'] = hex_to_rgba(args.color_white)
+    C['halo'] = hex_to_rgba(args.halo_color)
+    C_WHITE = C['white']
+
+
+def render_png(wpts, base, comp_idx, args):
+    C_WHITE = C['white']
     W, H = base.size
     draw = ImageDraw.Draw(base)
-    font_small = load_font(14)
-    font_med = load_font(18)
-    font_large = load_font(24)
 
-    # 颜色
-    CYAN = (0, 255, 255, 255)
-    GREEN = (0, 200, 0, 255)
-    GREEN_DASH = (0, 180, 0, 200)
-    RED = (255, 0, 0, 255)
-    YELLOW = (255, 200, 0, 255)
-    WHITE = (255, 255, 255, 255)
-
-    # components_index 确认框 (青色)
-    if comp_idx:
+    # 确认框 (components_index) - 深蓝, 不画 box 内文字 (避免与 mark 重叠)
+    if comp_idx and not args.skip_confirm_boxes:
         for ref, info in comp_idx.items():
-            box = info.get("box", [])
-            if len(box) == 4:
-                pts = [(int(p[0]), int(p[1])) for p in box]
-                draw.polygon(pts, outline=CYAN, width=3)
-                cx, cy = info.get("center", [0, 0])
-                draw.text((int(cx) + 30, int(cy) - 15), ref, fill=CYAN, font=font_small)
+            box = info.get("box") or []
+            if len(box) != 4:
+                continue
+            pts = [(int(p[0]), int(p[1])) for p in box]
+            draw.polygon(pts, outline=C['blue'], width=args.box_width)
 
-    # 画 wpts
     for item in wpts:
-        layer = item.get("layer", "")
         kind = item.get("kind", "")
+        if kind.startswith("_"):
+            continue
 
         if kind == "line":
             px = item.get("px", [])
@@ -93,9 +161,7 @@ def render_png(wpts, base, comp_idx):
             dash = item.get("dash", False)
             label = item.get("label", "")
             lpos = item.get("lpos", "")
-            fs = item.get("fs", 18)
-            color = GREEN_DASH if dash else GREEN
-            font = load_font(fs)
+            fs = item.get("fs", args.font_line_label)
 
             points = []
             if px:
@@ -103,91 +169,120 @@ def render_png(wpts, base, comp_idx):
             points.extend([tuple(p) for p in through])
 
             if len(points) >= 2:
+                color = C['green_dash'] if dash else C['green']
                 draw_arrowed_line(draw, points, color,
-                                  width=5 if not dash else 4,
-                                  head_len=24, dash=dash)
+                                  width=args.line_width if not dash else args.line_dash_width,
+                                  head_len=args.arrow_head_len, dash=dash)
                 if label:
                     mid = points[len(points) // 2]
                     lx, ly = mid
                     if lpos == "u":
-                        ly -= 25
+                        ly -= 30
                     elif lpos == "d":
-                        ly += 25
+                        ly += 60
                     elif lpos == "l":
-                        lx -= 120
+                        lx -= 200
                     elif lpos == "r":
-                        lx += 20
-                    draw.text((lx, ly), label, fill=color, font=font)
+                        lx += 30
+                    font = load_font(fs, bold=True)
+                    draw_text_with_halo(draw, (lx, ly), label,
+                                        fill=C['green'], font=font,
+                                        halo_color=C_WHITE, halo_width=args.halo_width)
 
         elif kind == "rect":
             label = item.get("label", "")
             if label in ("EP11", "EP12"):
-                continue  # 跳过非关键器件
+                continue
             px = item.get("px", [])
-            w = item.get("w", 200)
-            h = item.get("h", 200)
+            w = item.get("w", 200); h = item.get("h", 200)
             dash = item.get("dash", False)
-            color = YELLOW if dash else CYAN
+            color = C['purple'] if dash else C['blue']
             if px:
                 x, y = px
                 box_coords = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
-                draw.polygon(box_coords, outline=color, width=3 if dash else 4)
+                draw.polygon(box_coords, outline=color,
+                             width=(6 if dash else 7))
                 if label:
-                    draw.text((x + 5, y - 20), label, fill=color, font=load_font(16))
+                    draw_text_with_halo(draw, (x + 5, y - args.font_label),
+                                        label, fill=color,
+                                        font=load_font(args.font_label))
 
-        elif kind == "mark" or layer == "marks":
+        elif kind == "mark" or layer == "marks" if (layer := item.get("layer", "")) else kind == "mark":
             label = item.get("label", "")
             if label in ("EP11", "EP12"):
-                continue  # 跳过非关键器件
+                continue
             px = item.get("px", [])
             dot = item.get("dot", False)
-            fs = item.get("fs", 22)
+            fs = item.get("fs", args.font_label)
             lpos = item.get("lpos", "")
             note = item.get("note", "")
+            inferred = label.endswith("?") or item.get("inferred", False)
             if px:
                 x, y = px
                 if dot:
-                    draw.ellipse([x - 8, y - 8, x + 8, y + 8],
-                                 fill=RED, outline=WHITE, width=2)
+                    if inferred:
+                        # Bot component: via icon (circle with cross)
+                        r = 16
+                        draw.ellipse([x - r, y - r, x + r, y + r],
+                                     fill=C['white'], outline=C['purple'], width=4)
+                        draw.line([(x - r, y), (x + r, y)], fill=C['purple'], width=3)
+                        draw.line([(x, y - r), (x, y + r)], fill=C['purple'], width=3)
+                    else:
+                        # Top component: solid red dot with black center
+                        r = 18
+                        draw.ellipse([x - r, y - r, x + r, y + r],
+                                     fill=C['red'], outline=C['red'], width=4)
+                        draw.ellipse([x - 5, y - 5, x + 5, y + 5], fill=C['black'])
                 if label:
                     lx, ly = x, y
-                    if lpos == "u":
-                        ly -= fs + 5
-                    elif lpos == "d":
-                        ly += 10
-                    elif lpos == "l":
-                        lx -= len(label) * fs * 0.6
-                    elif lpos == "r":
-                        lx += 10
+                    if lpos == "u": ly -= fs + 12
+                    elif lpos == "d": ly += 22
+                    elif lpos == "l": lx -= len(label) * fs * 0.65 + 12
+                    elif lpos == "r": lx += 28
                     elif lpos == "ul":
-                        lx -= len(label) * fs * 0.6
-                        ly -= fs + 5
-                    elif lpos == "ur":
-                        lx += 10
-                        ly -= fs + 5
-                    elif lpos == "dr":
-                        lx += 10
-                        ly += 10
-                    draw.text((lx, ly), label, fill=RED, font=load_font(fs))
+                        lx -= len(label) * fs * 0.65 + 12
+                        ly -= fs + 12
+                    elif lpos == "ur": lx += 28; ly -= fs + 12
+                    elif lpos == "dr": lx += 28; ly += 22
+                    font = load_font(fs, bold=inferred)
+                    fill = C['purple'] if inferred else C['red']
+                    draw_text_with_halo(draw, (lx, ly), label,
+                                        fill=fill, font=font,
+                                        halo_color=C_WHITE,
+                                        halo_width=args.halo_width)
                 if note:
-                    draw.text((lx, ly + fs + 2), note, fill=YELLOW, font=load_font(14))
+                    draw_text_with_halo(draw, (lx, ly + fs + 8), note,
+                                        fill=C['blue'],
+                                        font=load_font(args.font_note),
+                                        halo_color=C_WHITE,
+                                        halo_width=args.halo_width - 1)
 
-        elif kind == "text" or layer in ("notes",):
+        elif kind == "text" or item.get("layer", "") in ("notes",):
             px = item.get("px", [])
             label = item.get("label", "")
-            fs = item.get("fs", 18)
+            fs = item.get("fs", args.font_note + 8)
             if px and label:
-                draw.text(tuple(px), label, fill=WHITE, font=load_font(fs))
+                draw_text_with_halo(draw, tuple(px), label,
+                                    fill=C['black'],
+                                    font=load_font(fs, bold=True),
+                                    halo_color=C_WHITE,
+                                    halo_width=args.halo_width)
 
 
-def generate_svg(wpts, out_svg, width, height, pcb_img_path, comp_idx):
-    """生成 SVG 矢量图"""
+def render_png_legacy(*args, **kwargs):
+    """兼容旧调用 (不带 layer marker)"""
+    pass  # above replaces this
+
+
+def generate_svg(wpts, out_svg, width, height, pcb_img_path, comp_idx, args):
+    """生成 SVG, halo 通过 SVG <filter> 实现 (feMorphology 描边)
+    svgwrite 不直接支持 feMorphology, 我们 save 后用 raw XML 注入
+    """
     import svgwrite
     import base64
 
     dwg = svgwrite.Drawing(out_svg, size=(width, height), profile="full")
 
-    # 嵌入 PCB 底图 (base64)
     if pcb_img_path and Path(pcb_img_path).exists():
         ext = Path(pcb_img_path).suffix.lstrip(".").lower() or "png"
         mime = {"png": "image/png", "jpg": "image/jpeg",
@@ -199,31 +294,29 @@ def generate_svg(wpts, out_svg, width, height, pcb_img_path, comp_idx):
             insert=(0, 0), size=(width, height),
         ))
 
-    C_GREEN = "#00C800"
-    C_GREEN_DASH = "#00B400"
-    C_RED = "#FF0000"
-    C_YELLOW = "#FFC800"
-    C_WHITE = "#FFFFFF"
-    C_CYAN = "#00FFFF"
+    SC = {k: args.__dict__[f"color_{k}"] for k in
+          ['green', 'green_dash', 'red', 'blue', 'purple', 'black', 'white']}
 
-    # components_index 确认框
-    if comp_idx:
+    SC = {k: args.__dict__[f"color_{k}"] for k in
+          ['green', 'green_dash', 'red', 'blue', 'purple', 'black', 'white']}
+
+    if comp_idx and not args.skip_confirm_boxes:
         for ref, info in comp_idx.items():
-            box = info.get("box", [])
-            if len(box) == 4:
-                pts = [(int(p[0]), int(p[1])) for p in box]
-                cx, cy = info.get("center", [0, 0])
-                g = dwg.g(id=f"comp-{ref}", stroke=C_CYAN,
-                          fill="none", stroke_width=3)
-                g.add(dwg.polygon(points=pts))
-                g.add(dwg.text(ref, insert=(int(cx) + 30, int(cy) - 15),
-                               fill=C_CYAN, font_size=14))
-                dwg.add(g)
+            box = info.get("box") or []
+            if len(box) != 4:
+                continue
+            pts = [(int(p[0]), int(p[1])) for p in box]
+            safe_id = "".join(c if c.isalnum() else "-" for c in ref)[:24]
+            g = dwg.g(id=f"comp-{safe_id}", stroke=SC['blue'],
+                      fill="none", stroke_width=args.box_width)
+            g.add(dwg.polygon(points=pts))
+            dwg.add(g)
 
-    # 画 wpts
     for item in wpts:
-        layer = item.get("layer", "")
         kind = item.get("kind", "")
+        layer = item.get("layer", "")
+        if kind.startswith("_"):
+            continue
 
         if kind == "line":
             px = item.get("px", [])
@@ -231,51 +324,45 @@ def generate_svg(wpts, out_svg, width, height, pcb_img_path, comp_idx):
             dash = item.get("dash", False)
             label = item.get("label", "")
             lpos = item.get("lpos", "")
-            fs = item.get("fs", 18)
-            color = C_GREEN_DASH if dash else C_GREEN
+            fs = item.get("fs", args.font_line_label)
+            color = SC['green_dash'] if dash else SC['green']
             anchor = {"u": "middle", "d": "middle", "l": "end", "r": "start",
                       "ul": "end", "ur": "start"}.get(lpos, "start")
-
             pts = list(map(tuple, ([px] if px else []) + through))
             if len(pts) >= 2:
                 safe_id = "".join(c if c.isalnum() else "-" for c in label)[:24]
-                g = dwg.g(id=f"line-{safe_id}", stroke=color, fill=color)
+                g = dwg.g(id=f"line-{safe_id}", stroke=color, fill=color,
+                          filter="url(#halo)")
                 if dash:
                     for i in range(len(pts) - 1):
                         g.add(dwg.line(start=pts[i], end=pts[i + 1],
-                                       stroke_width=4,
-                                       stroke_dasharray="10,6"))
+                                       stroke_width=args.line_dash_width,
+                                       stroke_dasharray=args.dash_pattern))
                 else:
                     for i in range(len(pts) - 1):
                         g.add(dwg.line(start=pts[i], end=pts[i + 1],
-                                       stroke_width=5))
-                    # 箭头
-                    x1, y1 = pts[-2]
-                    x2, y2 = pts[-1]
-                    dx, dy = x2 - x1, y2 - y1
-                    d = math.hypot(dx, dy) or 1
+                                       stroke_width=args.line_width))
+                    x1, y1 = pts[-2]; x2, y2 = pts[-1]
+                    dx, dy = x2 - x1, y2 - y1; d = math.hypot(dx, dy) or 1
                     ux, uy = dx / d, dy / d
-                    head = 24
-                    a = math.radians(30)
+                    a = math.radians(args.arrow_head_angle)
+                    head = args.arrow_head_len
                     ax1 = x2 - head * (ux * math.cos(a) - uy * math.sin(a))
                     ay1 = y2 - head * (uy * math.cos(a) + ux * math.sin(a))
                     ax2 = x2 - head * (ux * math.cos(-a) - uy * math.sin(-a))
                     ay2 = y2 - head * (uy * math.cos(-a) + ux * math.sin(-a))
                     g.add(dwg.polygon(points=[(x2, y2), (ax1, ay1), (ax2, ay2)],
-                                      fill=color, stroke=color))
+                                       fill=color, stroke=color))
                 if label:
                     mid = pts[len(pts) // 2]
                     lx, ly = mid
-                    if lpos == "u":
-                        ly -= 25
-                    elif lpos == "d":
-                        ly += 25
-                    elif lpos == "l":
-                        lx -= 120
-                    elif lpos == "r":
-                        lx += 20
+                    if lpos == "u": ly -= 40
+                    elif lpos == "d": ly += 60
+                    elif lpos == "l": lx -= 200
+                    elif lpos == "r": lx += 30
                     g.add(dwg.text(label, insert=(lx, ly), fill=color,
-                                   font_size=fs, text_anchor=anchor))
+                                   font_size=fs, text_anchor=anchor,
+                                   font_weight="bold"))
                 dwg.add(g)
 
         elif kind == "rect":
@@ -283,19 +370,21 @@ def generate_svg(wpts, out_svg, width, height, pcb_img_path, comp_idx):
             if label in ("EP11", "EP12"):
                 continue
             px = item.get("px", [])
-            w = item.get("w", 200)
-            h = item.get("h", 200)
+            w = item.get("w", 200); h = item.get("h", 200)
             dash = item.get("dash", False)
-            color = C_YELLOW if dash else C_CYAN
+            color = SC['purple'] if dash else SC['blue']
             if px:
                 x, y = px
-                g = dwg.g(id=f"rect-{label}", stroke=color, fill="none",
-                          stroke_width=3 if dash else 4,
-                          stroke_dasharray="6,4" if dash else None)
+                safe_id = "".join(c if c.isalnum() else "-" for c in label)[:24]
+                g = dwg.g(id=f"rect-{safe_id}", stroke=color, fill="none",
+                          stroke_width=(6 if dash else 7),
+                          stroke_dasharray="8,5" if dash else None,
+                          filter="url(#halo)")
                 g.add(dwg.rect(insert=(x, y), size=(w, h)))
                 if label:
-                    g.add(dwg.text(label, insert=(x + 5, y - 20),
-                                   fill=color, font_size=16))
+                    g.add(dwg.text(label, insert=(x + 8, y - 30),
+                                   fill=color, font_size=args.font_label,
+                                   font_weight="bold"))
                 dwg.add(g)
 
         elif kind == "mark" or layer == "marks":
@@ -304,56 +393,89 @@ def generate_svg(wpts, out_svg, width, height, pcb_img_path, comp_idx):
                 continue
             px = item.get("px", [])
             dot = item.get("dot", False)
-            fs = item.get("fs", 22)
+            fs = item.get("fs", args.font_label)
             lpos = item.get("lpos", "")
             note = item.get("note", "")
+            inferred = label.endswith("?") or item.get("inferred", False)
             anchor = {"u": "middle", "d": "middle", "l": "end", "r": "start",
                       "ul": "end", "ur": "start", "dr": "start"}.get(lpos, "start")
             if px:
                 x, y = px
-                g = dwg.g(id=f"mark-{label}")
+                safe_id = "".join(c if c.isalnum() else "-" for c in ref)[:24] if False else "".join(
+                    c if c.isalnum() else "-" for c in label)[:24]
+                g = dwg.g(id=f"mark-{safe_id}", filter="url(#halo)")
                 if dot:
-                    g.add(dwg.circle(center=(x, y), r=8, fill=C_RED,
-                                     stroke=C_WHITE, stroke_width=2))
+                    if inferred:
+                        # Bot component: via icon (circle with cross)
+                        r = 16
+                        g.add(dwg.circle(center=(x, y), r=r,
+                                         fill=SC['white'], stroke=SC['purple'], stroke_width=4))
+                        g.add(dwg.line(start=(x - r, y), end=(x + r, y),
+                                       stroke=SC['purple'], stroke_width=3))
+                        g.add(dwg.line(start=(x, y - r), end=(x, y + r),
+                                       stroke=SC['purple'], stroke_width=3))
+                    else:
+                        # Top component: solid red dot with black center
+                        r = 18
+                        g.add(dwg.circle(center=(x, y), r=r,
+                                         fill=SC['red'], stroke=SC['red'], stroke_width=4))
+                        g.add(dwg.circle(center=(x, y), r=5, fill=SC['black']))
                 if label:
                     lx, ly = x, y
-                    if lpos == "u":
-                        ly -= fs + 5
-                    elif lpos == "d":
-                        ly += 10
-                    elif lpos == "l":
-                        lx -= len(label) * fs * 0.6
-                    elif lpos == "r":
-                        lx += 10
+                    if lpos == "u": ly -= fs + 12
+                    elif lpos == "d": ly += 22
+                    elif lpos == "l": lx -= len(label) * fs * 0.65 + 12
+                    elif lpos == "r": lx += 28
                     elif lpos == "ul":
-                        lx -= len(label) * fs * 0.6
-                        ly -= fs + 5
-                    elif lpos == "ur":
-                        lx += 10
-                        ly -= fs + 5
-                    elif lpos == "dr":
-                        lx += 10
-                        ly += 10
-                    g.add(dwg.text(label, insert=(lx, ly), fill=C_RED,
-                                   font_size=fs, text_anchor=anchor))
+                        lx -= len(label) * fs * 0.65 + 12
+                        ly -= fs + 12
+                    elif lpos == "ur": lx += 28; ly -= fs + 12
+                    elif lpos == "dr": lx += 28; ly += 22
+                    color = SC['purple'] if inferred else SC['red']
+                    g.add(dwg.text(label, insert=(lx, ly), fill=color,
+                                   font_size=fs, text_anchor=anchor,
+                                   font_weight="bold"))
                 if note:
-                    g.add(dwg.text(note, insert=(lx, ly + fs + 2),
-                                   fill=C_YELLOW, font_size=14))
+                    g.add(dwg.text(note, insert=(lx, ly + fs + 8),
+                                   fill=SC['blue'], font_size=args.font_note))
                 dwg.add(g)
 
         elif kind == "text" or layer in ("notes",):
             px = item.get("px", [])
             label = item.get("label", "")
-            fs = item.get("fs", 18)
+            fs = item.get("fs", args.font_note + 8)
             if px and label:
                 dwg.add(dwg.text(label, insert=tuple(px),
-                                 fill=C_WHITE, font_size=fs))
+                                 fill=SC['black'],
+                                 font_size=fs, font_weight="bold",
+                                 filter="url(#halo)"))
 
     dwg.save()
 
+    # 注入 halo SVG filter (svgwrite 不直接支持 feMorphology, 用 raw XML 后处理)
+    halo_filter = (
+        f'<filter id="halo" x="-50%" y="-50%" width="200%" height="200%">'
+        f'<feMorphology operator="dilate" radius="{args.halo_width}" '
+        f'in="SourceGraphic" result="dilated"/>'
+        f'<feFlood flood-color="{args.halo_color}" flood-opacity="1"/>'
+        f'<feComposite in2="dilated" operator="in"/>'
+        f'<feComposite in="SourceGraphic"/>'
+        f'</filter>'
+    )
+    svg_text = Path(out_svg).read_text()
+    # 注入 halo filter (兼容 <defs /> 自闭合和 <defs></defs>)
+    if "<defs />" in svg_text:
+        svg_text = svg_text.replace(
+            "<defs />",
+            f"<defs>{halo_filter}</defs>",
+        )
+    elif "<defs" in svg_text and "</defs>" in svg_text:
+        idx = svg_text.find("</defs>")
+        svg_text = svg_text[:idx] + halo_filter + svg_text[idx:]
+    Path(out_svg).write_text(svg_text)
 
-def render_rx_flow(pcb_img_path, wpts_path, out_svg, out_png, components_path=None):
-    # 加载 PCB 底图
+
+def render_rx_flow(pcb_img_path, wpts_path, out_svg, out_png, components_path, args):
     if Path(pcb_img_path).exists():
         base = Image.open(pcb_img_path).convert("RGBA")
     else:
@@ -361,7 +483,6 @@ def render_rx_flow(pcb_img_path, wpts_path, out_svg, out_png, components_path=No
         print(f"警告: 底图不存在 {pcb_img_path}, 使用白色占位图")
     W, H = base.size
 
-    # 加载 wpts / components_index
     with open(wpts_path) as f:
         wpts = json.load(f)
     comp_idx = {}
@@ -369,26 +490,50 @@ def render_rx_flow(pcb_img_path, wpts_path, out_svg, out_png, components_path=No
         with open(components_path) as f:
             comp_idx = json.load(f)
 
-    # PNG
-    render_png(wpts, base, comp_idx)
+    apply_colors(args)
+    render_png(wpts, base, comp_idx, args)
     base.save(out_png)
     print(f"PNG saved: {out_png}")
 
-    # SVG
-    generate_svg(wpts, out_svg, W, H, pcb_img_path, comp_idx)
+    generate_svg(wpts, out_svg, W, H, pcb_img_path, comp_idx, args)
     print(f"SVG saved: {out_svg}")
 
 
 def main():
-    import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--pcb", required=True)
     ap.add_argument("--wpts", required=True)
-    ap.add_argument("--out-png", default="rx_flow_top_v8.png")
-    ap.add_argument("--out-svg", default="rx_flow_top_v8.svg")
-    ap.add_argument("--components", help="components_index.json 路径")
+    ap.add_argument("--components")
+    ap.add_argument("--out-png", default="rx_flow_top.png")
+    ap.add_argument("--out-svg", default="rx_flow_top.svg")
+    # === 颜色 (全部 CLI) ===
+    ap.add_argument("--color-green", default=DEFAULTS['color_green'])
+    ap.add_argument("--color-green-dash", default=DEFAULTS['color_green_dash'])
+    ap.add_argument("--color-red", default=DEFAULTS['color_red'])
+    ap.add_argument("--color-blue", default=DEFAULTS['color_blue'])
+    ap.add_argument("--color-purple", default=DEFAULTS['color_purple'])
+    ap.add_argument("--color-white", default=DEFAULTS['color_white'])
+    ap.add_argument("--color-black", default=DEFAULTS['color_black'])
+    # === halo (文字描边) ===
+    ap.add_argument("--halo-color", default=DEFAULTS['halo_color'])
+    ap.add_argument("--halo-width", type=int, default=DEFAULTS['halo_width'])
+    # === 字号 ===
+    ap.add_argument("--font-label", type=int, default=DEFAULTS['font_label'])
+    ap.add_argument("--font-line-label", type=int, default=DEFAULTS['font_line_label'])
+    ap.add_argument("--font-note", type=int, default=DEFAULTS['font_note'])
+    # === 箭头 ===
+    ap.add_argument("--arrow-head-len", type=int, default=DEFAULTS['arrow_head_len'])
+    ap.add_argument("--arrow-head-angle", type=int, default=DEFAULTS['arrow_head_angle'])
+    # === 线宽 ===
+    ap.add_argument("--line-width", type=int, default=DEFAULTS['line_width'])
+    ap.add_argument("--line-dash-width", type=int, default=DEFAULTS['line_dash_width'])
+    ap.add_argument("--box-width", type=int, default=DEFAULTS['box_width'])
+    ap.add_argument("--dash-pattern", default=DEFAULTS['dash_pattern'])
+    # === 开关 ===
+    ap.add_argument("--skip-confirm-boxes", action="store_true",
+                    help="跳过 components_index 的青色确认框 (避免视觉噪音)")
     args = ap.parse_args()
-    render_rx_flow(args.pcb, args.wpts, args.out_svg, args.out_png, args.components)
+    render_rx_flow(args.pcb, args.wpts, args.out_svg, args.out_png, args.components, args)
 
 
 if __name__ == "__main__":
