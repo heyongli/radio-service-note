@@ -37,7 +37,7 @@
 
 ## 基本工具用法说明
 * 用到脚本放入 tools/目录; 工具需要参数化
-* **OCR 工具默认尝试 DirectML GPU**: 所有调用 RapidOCR 的工具, 启动时先 `from dml_helper import enable_dml; enable_dml()`, 失败再 fallback CPU。详见 `best_practices.md` §12 + `tools/ai_ocr_eval/dml_helper.py`。
+* **OCR 工具默认尝试 DirectML GPU**: 所有调用 RapidOCR 的工具, 启动时先 `from dml_helper import enable_dml; enable_dml()`, 失败再 fallback CPU。详见 `best_practices.md` §12 + `tools/zref/ai_ocr_eval/dml_helper.py`。
 
 
 

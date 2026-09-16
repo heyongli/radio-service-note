@@ -1,7 +1,7 @@
-# tools/ic_ocr_scan — 设计文档
+# tools/label_ocr_scan — 设计文档
 
 ## purpose
-IC 候选矩形多角度 OCR 扫描 — 对 `crops_index.json` 中 `category=ic` 的候选做 0/90/270° 旋转 OCR, 找到 IC 编号 (IC10/IC11/IC12 等), 更新 `crops_index.json` 的 `refdes/status` 字段。
+IC 候选矩形多角度 OCR 扫描 — 对 `crops_index.json` 中候选 (矩形或圆形)做 0/90/270° 旋转 OCR, 找到 IC 编号 (IC10/IC11/IC12 等), 更新 `crops_index.json` 的 `refdes/status` 字段。
 
 ## format
 Python 3 + RapidOCR (CPU)
@@ -35,7 +35,7 @@ Python 3 + RapidOCR (CPU)
 
 ### 2.1 Linux CPU (慢)
 ```bash
-python3 tools/ic_ocr_scan/ic_ocr_scan.py \
+python3 tools/label_ocr_scan/label_ocr_scan.py \
     --crops-index projects/icom2200h/crops/rectangle/crops_index.json \
     --pcb projects/icom2200h/render/pcb-top-600-1.png \
     --view top \
@@ -45,11 +45,11 @@ python3 tools/ic_ocr_scan/ic_ocr_scan.py \
 ### 2.2 Windows DirectML GPU (快, 推荐)
 ```bash
 # 方式 1: bat 脚本 (本目录下)
-tools/ic_ocr_scan/run_ic_ocr_dml.bat          # 全类别 OCR
-tools/ic_ocr_scan/run_ic_ocr_dml_test.bat     # 验证 GPU 是否真正加速
+tools/label_ocr_scan/run_ic_ocr_dml.bat          # 全类别 OCR
+tools/label_ocr_scan/run_ic_ocr_dml_test.bat     # 验证 GPU 是否真正加速
 
 # 方式 2: 直接调用
-C:\Users\radio\py311\python.exe tools\ic_ocr_scan\ic_ocr_scan_dml.py ^
+C:\Users\radio\py311\python.exe tools\label_ocr_scan\label_ocr_scan_dml.py ^
     --crops-index projects\icom2200h\crops\rectangle\crops_index.json ^
     --pcb projects\icom2200h\render\pcb-top-600-1.png ^
     --view top ^
@@ -57,7 +57,7 @@ C:\Users\radio\py311\python.exe tools\ic_ocr_scan\ic_ocr_scan_dml.py ^
 ```
 
 **DML 前提**: Windows 原生 Python + onnxruntime-directml + dml_helper.py (monkey-patch ProviderConfig)。
-详见 `best_practices.md` §12 + `tools/ai_ocr_eval/dml_helper.py`。
+详见 `best_practices.md` §12 + `tools/zref/ai_ocr_eval/dml_helper.py`。
 
 ---
 
@@ -96,7 +96,7 @@ rot=0:   ox = rx,        oy = ry
 rot=90:  ox = ry,        oy = Hc - 1 - rx     (Hc = 原始 crop 高度)
 rot=270: ox = Wc - 1 - ry, oy = rx            (Wc = 原始 crop 宽度)
 ```
-已固化在 `ocr_crop` (`ic_ocr_scan.py` + `ic_ocr_scan_dml.py`)。
+已固化在 `ocr_crop` (`label_ocr_scan.py` + `label_ocr_scan_dml.py`)。
 
 **验证 (2026-09-16)**:
 - IC4 校正后 (1487,2516) 与 crop-ocr 确认本体 (1489,2516) 一致

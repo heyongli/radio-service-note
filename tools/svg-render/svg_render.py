@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""tools/render_rx_flow.py - RX flow 渲染
+"""tools/svg-render/svg_render.py - RX flow 渲染
 
 purpose: wpts + components_index → PNG/SVG 标注图 (PCB 顶视/底视, 信号流标注)
 format: Python 3 + PIL + svgwrite

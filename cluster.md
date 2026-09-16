@@ -1,3 +1,4 @@
+
 # OCR 协同计算集群说明
 
 本文件记录参与 OCR 协同计算的各机器信息、任务分工与连通方式。
@@ -161,7 +162,7 @@
 
 ## 协同工作流
 
-1. `scp` 更新 `tools/ai_ocr_eval/ai_refdes_ocr.py` 与待扫底图到从机。
+1. `scp` 更新 `tools/zref/ai_ocr_eval/ai_refdes_ocr.py` 与待扫底图到从机。
 2. 远程执行 `./slave_remote.sh <top600|bot600|smoke|check|pull>`。
 3. `./slave_remote.sh pull` 可读各任务 result.json hits 数(远程已含该脚本)。
 4. 结果按 `--out-dpi 600` 空间回传, 主控 ÷2 转 300dpi 入 components_index,
@@ -175,4 +176,4 @@
 | top600 | pcb-top-600 | 600 | v4,v5s s1 / v4,v6 s2 | 900/350, upscale1.5, rots 0/90/270 | 全板高精度 |
 | bot600 | pcb-bot-600 | 600 | 同上 | 同上 | 背面全板高精度 |
 
-工具参数完整清单见 `tools/ai_ocr_eval/ai_refdes_ocr.py --help`。
+工具参数完整清单见 `tools/zref/ai_ocr_eval/ai_refdes_ocr.py --help`。

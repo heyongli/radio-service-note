@@ -74,7 +74,7 @@ pdftoppm -r 600 -png xx-top.pdf top600
 # 多阈值 t=100~250 并行跑, 合并去重交叉验证
 ```
 
-配方已固化为工具:`tools/pcb_designator_ocr/ocr_designators.py`
+配方已固化为工具:`tools/zref/pcb_designator_ocr/ocr_designators.py`
 (多阈值 psm11 + 字形聚类兜底 + 同位去重 + 误读归一 F1x→FIx/D1z→D12)。
 要领(部分仍适用于 AI 管线, 保留):
 - **不要加字符白名单**:"IC10" 会因白名单吞掉 I 变成 "C10"/"CC)";
@@ -92,7 +92,7 @@ pdftoppm -r 600 -png xx-top.pdf top600
 
 **结论: 没有可直接读位号的 PCB 专用开源 AI**(PANEL-Net/Redraw/Atlas 查无
 此 repo; 现存原理图→网表项目内部都用通用 OCR)。CPU 首选 **RapidOCR
-(PP-OCRv4/v5/v6, onnxruntime)**。工具: `tools/ai_ocr_eval/ai_refdes_ocr.py`。
+(PP-OCRv4/v5/v6, onnxruntime)**。工具: `tools/zref/ai_ocr_eval/ai_refdes_ocr.py`。
 
 实测要点(600dpi PCB top, 7017x4959):
 - **全页直接 OCR 会漏小字**(det 输入尺寸限制, rapidocr v3 Global.max_side_len
@@ -104,7 +104,7 @@ pdftoppm -r 600 -png xx-top.pdf top600
   ("I C 1 0", 匹配前先去空格); 双引擎同位一致(agree)≈自动预确认;
 - contour(内容轮廓+二分细分)模式: 用 cv2 传统工具(轮廓检测是成熟问题,
   不需要 AI), 密集板面不如 grid(29s/58 refdes vs 17.5s/68), 稀疏页面才用;
-- 参数全部 CLI 可调, 已验证值与踩坑记在 `tools/ai_ocr_eval/README.md`;
+- 参数全部 CLI 可调, 已验证值与踩坑记在 `tools/zref/ai_ocr_eval/README.md`;
   **每次运行 JSON 归档**(版本/参数/日期), 用 compare_runs.py 对比调参,
   `--reuse-stage1` 复用中间结果避免重复烧算力。
 - **对旧网表审计成果**: 24 锚点纠出 5 错(IC10/FI1/R221 坐标错、J4/J7 视图
@@ -201,7 +201,7 @@ pdftoppm -r 600 -png xx-top.pdf top600
 
 ## 8. 标注与数据层
 
-- **原理图/PCB 标注首选 SVG 分层**(`tools/annotate_svg_flow/`): 仿
+- **原理图/PCB 标注首选 SVG 分层**(`tools/zref/annotate_svg_flow/`): 仿
   `example/talkabout-bot.svg` 分层原则; 底图 base64 内嵌+图层锁定;
   实线=确认/虚线=推断/not-located 进 notes 层。旧 raster 标注
   (add_photo_wpts) 保留给照片场景。
@@ -218,8 +218,8 @@ pdftoppm -r 600 -png xx-top.pdf top600
 1. 先 `pdftotext` 全文 dump → 建立位号/信号名清单与坐标;
 2. `pdftocairo -svg` + 字形解析补齐描边文字;
 3. 渲染 PNG,用颜色掩膜定位红/绿信号路径;
-4. PCB 视图标注:位号级方案用 `tools/pcb_designator_ocr/`(OCR 位号) +
-   `tools/annotate_rx_flow/add_photo_wpts.py`(waypoints JSON 渲染,
+4. PCB 视图标注:位号级方案用 `tools/zref/pcb_designator_ocr/`(OCR 位号) +
+   `tools/zref/annotate_rx_flow/add_photo_wpts.py`(waypoints JSON 渲染,
    实线=确认/虚线=推断) —— 产出 `projects/<机型>/annot/top_pcb_rx.png`
    与 `nettable/top_pcb.json`、`nettable/top_designators.json`;
    旧的块级 `annotate_rx_flow.py` 仅作备留;
@@ -437,7 +437,7 @@ cmd.exe /c "\"C:\\Users\\radio\\ocr_gpu_venv\\Scripts\\python.exe\" \"C:\\Users\
 - `B` ↔ `8`
 - `Q` ↔ `O`
 
-**程序内化修正**: `MISREAD_MAP` + `fix_misread()` 实现见 `tools/ai_ocr_eval/ai_refdes_ocr.py`。
+**程序内化修正**: `MISREAD_MAP` + `fix_misread()` 实现见 `tools/zref/ai_ocr_eval/ai_refdes_ocr.py`。
 
 **手动修正案例**:
 - OCR "FI3" @ (3292, 2319) → 修正为 "F13" (chain_order 里有 F13)

@@ -18,9 +18,12 @@ radio-service-note/
 │   ├── rectangle_locator/      # 矩形轮廓检测 + 裁切
 │   ├── circle_locator/         # 圆形轮廓检测 + 裁切
 │   ├── ic_ocr_scan/            # 多角度 OCR (CPU/DML)
-│   ├── ai_ocr_eval/            # AI OCR 评估工具
-│   ├── render_rx_flow.py       # RX 流程渲染
-│   └── annotate_svg_flow/      # SVG 分层标注
+│   ├── ic_package_detect/      # IC 封装定位
+│   ├── svg-render/             # 信号流标注渲染 (PNG+SVG)
+│   ├── signal_flow_route/      # 信号流自动路由
+│   ├── components_index/       # 元器件索引构建
+│   ├── verify_anchor/          # 坐标锚点验证
+│   └── ref/                    # 参考/旧管线 (ai_ocr_eval, annotate_svg_flow 等)
 ├── projects/
 │   └── <机型>/                 # 例如 icom2200h
 │       ├── components_index.json   # 元器件索引(枢纽)
@@ -46,9 +49,9 @@ radio-service-note/
 | `render/` | 只读输入 | pdftoppm 输出的 PCB 光栅图 | pdf→png |
 | `crops/rectangle/` | 中间产物 | 矩形裁切 + 索引 | `rectangle_locator.py` |
 | `crops/circle/` | 中间产物 | 圆形裁切 + 索引 | `circle_locator.py` |
-| `annot/` | 最终输出 | **仅** SVG + PNG 标注图 | `annotate_svg_flow` |
+| `annot/` | 最终输出 | **仅** SVG + PNG 标注图 | `svg_render.py` |
 | `nettable/` | 结构化数据库 | waypoints/链序/锚点 JSON | OCR → 索引 |
-| `ocr_runs/` | 只读归档 | OCR 运行 JSON 归档 | `ai_refdes_ocr.py` |
+| `ocr_runs/` | 只读归档 | OCR 运行 JSON 归档 | `tools/zref/ai_ocr_eval/ai_refdes_ocr.py` |
 
 ### 清理规则
 
@@ -372,7 +375,7 @@ tools/<tool_name>/
 
 **首选**: 矩形+圆形裁切+DirectML OCR (§3)
 
-**旧管线** (参考): `ai_refdes_ocr.py` (RapidOCR PP-OCRv4/v5/v6)
+**旧管线** (参考, `tools/zref/`): `ai_refdes_ocr.py` (RapidOCR PP-OCRv4/v5/v6)
 - 工作流: `--preset fast` → `--reuse-stage1` → 针对性细化
 - 运行 JSON 归档于 ocr_runs/
 
@@ -452,7 +455,7 @@ rot=270: ox = Wc - 1 - ry, oy = rx            (Wc = 原始 crop 宽度)
 | 工具 | 路径 | 用途 |
 |---|---|---|
 | `signal_flow_route.py` | `tools/signal_flow_route/` | 信号流自动路由, 生成 waypoints |
-| `render_rx_flow.py` | `tools/render_rx_flow/` | 渲染 RX/TX 信号流标注图 |
+| `svg_render.py` | `tools/svg-render/` | 渲染 RX/TX 信号流标注图 |
 
 **waypoints (wpts)**: 描述信号流路径的 JSON 文件, 是渲染的唯一输入。每条记录包含起点
  `px`、拐点 `through`、线型 `dash`、标记 `mark_type` 等。所有坐标统一在 600dpi top view 空间。
@@ -468,10 +471,10 @@ rot=270: ox = Wc - 1 - ry, oy = rx            (Wc = 原始 crop 宽度)
 8. **via 标记**: 跨面连接的到达端标红色空心圆 (过孔), wpts 中 `mark_type: "via"`
 9. **IC 轮廓**: flow 设计 IC (`outline: true`) 标轮廓矩形; 同面红色实线, 另一面紫色虚线
 
-**render_rx_flow.py** (固化渲染规则):
+**svg_render.py** (固化渲染规则):
 - 实线/虚线: 虚线用 semi-transparent 绘制, 避免遮挡 PCB 底图
 - via 标记: 红色空心圆 (width=12, r=18)
 - 箭头: 每段连线终点, 跟随信号流方向
 
 **输入**: JSON config (components 坐标/view/lpos + connections 列表)
-**输出**: wpts JSON, 与 `render_rx_flow.py` 兼容
+**输出**: wpts JSON, 与 `svg_render.py` 兼容
