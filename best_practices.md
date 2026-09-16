@@ -1,4 +1,5 @@
-# Best Practices: Icom 维修手册 PDF(电路图/点位图)处理
+
+# best practices: icom 维修手册 PDF(电路图/点位图)处理
 
 针对本项目任务:从 `IC-2200H-*.pdf`(信号流程图 / PCB top / PCB bot)中提取信息,
 在 PCB 点位图上标注 RX/TX 信号流程。以下为已验证的经验总结。
@@ -11,6 +12,11 @@
 | `IC-2200H-top.pdf` | 9-2 MAIN UNIT TOP VIEW(PCB 顶视/丝印图) | 仅少量连接器标注(ANT、CHASSIS J1、J11、232TX…) | 其余为图形 |
 | `IC-2200H-bot.pdf` | 9-4 BOTTOM VIEW(底视/铜箔图) | 仅连接器标注(DATA、SP、引脚号) | 铜箔图形 + 粉色填充的元件外形 |
 
+
+* 很多日本机器原理图rx绿线是**贯穿的流程线**(一段接一段, 有分支: AGC/SQL/VCO 辅助),
+  不是若干孤立坐标点; PCB 标注必须同样给出**连续可追踪的信号路径**。
+
+
 关键结论(2026-09 修订):**top/bot 视图 PDF 的文本层确实没有位号,
 但页面是内嵌光栅图 —— 渲染成 PNG 后位号清晰可见**(300dpi 已可读,
 600dpi 更佳)。`pdftotext` 读不到 ≠ 图上没有。位号级定位直接对渲染图
@@ -21,7 +27,7 @@
 ```bash
 # 1) 元件位号/参数(带坐标,300dpi 图像空间直接可用)
 pdftotext -bbox IC-2200H-rxtxflow.pdf out.html
-# 坐标换算: px = pt * dpi/72;pdftoppm 渲染已按页面 /Rotate 旋转,bbox 输出与渲染图像同方向
+# 坐标换算: px = pt * dpi/72;pdftoppm 渲染已按页面 /rotate 旋转,bbox 输出与渲染图像同方向
 # 2) 纯文本
 pdftotext -layout xx.pdf -
 # 3) 矢量图形导出(pdftotext 读不到的描边文字会变成 path)
@@ -54,7 +60,7 @@ pdftoppm -r 300 -png xx.pdf out300   # 对照/快速底图(3509x2480)
 - **黄** = 电源/控制
 可用颜色掩膜统计像素并按块定位路径走向。
 
-## 5. OCR: PCB 点位图(top/bot)位号识别的有效配方(2026-09 实战验证)
+## 5. OCR: PCB 点位图(top/bot)位号识别的有效配方
 
 **适用性分界(重要)**:rxtxflow 原理图的描边字形功能块标签 OCR 无效(§5 旧结论仍成立,
 原因:hairline 矢量描边);但 **top/bot PCB 图是光栅位图印刷体,OCR 完全有效**。
@@ -65,7 +71,7 @@ pdftoppm -r 300 -png xx.pdf out300   # 对照/快速底图(3509x2480)
 # 1) 600dpi 渲染(位号笔画更饱满)
 pdftoppm -r 600 -png xx-top.pdf top600
 # 2) 灰度→autocontrast→多档二值化→2-3x LANCZOS 上采样→psm11 TSV
-#    多阈值 T=100~250 并行跑, 合并去重交叉验证
+# 多阈值 t=100~250 并行跑, 合并去重交叉验证
 ```
 
 配方已固化为工具:`tools/pcb_designator_ocr/ocr_designators.py`
@@ -82,7 +88,7 @@ pdftoppm -r 600 -png xx-top.pdf top600
   (300/600dpi) 是唯一可靠底图。
 - tesseract 管线保留为对照基线, 不再迭代。
 
-## 5A. AI-OCR 管线(2026-09-10 起, 替代 §5 作首选)
+## 5a. AI-OCR 管线(替代 §5 作首选)
 
 **结论: 没有可直接读位号的 PCB 专用开源 AI**(PANEL-Net/Redraw/Atlas 查无
 此 repo; 现存原理图→网表项目内部都用通用 OCR)。CPU 首选 **RapidOCR
@@ -113,7 +119,7 @@ pdftoppm -r 600 -png xx-top.pdf top600
 - 绿(RX IF/AF)约 1.2%, 蓝(RX 前端)约 0.04%。TX 红路径遍布图面,
   区域级 zone 无意义(bbox 覆盖 >30% 应丢弃), 待逐线读序(todo)。
 
-## 5B. Block 图(IC-2200H-block.pdf)——流程恢复首选源 (2026-09-10)
+## 5b. block 图(ic-2200h-block.pdf)——流程恢复首选源
 
 - **block 图有真文本层**(Helvetica Type1C, 526 词, pdftotext 直读)——与 rxtxflow 的
   描边字形不同, 拓扑恢复应从它入手; bbox 坐标已含 /Rotate 90, 直接对齐横版 300dpi 渲染。
@@ -122,7 +128,7 @@ pdftoppm -r 600 -png xx-top.pdf top600
   (block 图 PWR AMP 框内; VGG 引脚 TX:6.7V/RX:0V 栅偏佐证); RX 前端 ATT 实为 D18
   PIN 二极管+SQLATT。角色认定一律回到 block 图框内标注。
 
-## 5B-2. rxtxflow 绿线 = RX 路径权威, 但"触及≠主路" (2026-09-10)
+## 5b-2. rxtxflow 绿线 = rx 路径权威, 但"触及≠主路"
 
 - 绿线掩膜(g>120,r/b<110)约 1.1% 像素; 膨胀 25px + 位号 55px 邻近判定得"触及集"
   (146 器件)——这只是**候选**, 必须按电路原理甄别主路:
@@ -133,7 +139,7 @@ pdftoppm -r 600 -png xx-top.pdf top600
 - 方法: 触及集 ∩ 原理分类 → 主路链; 与 block 图链序交叉验证。
 
 
-## 5C. IC 封装定位三法(pin-silk / body / contour)(2026-09-10)
+## 5c. IC 封装定位三法(pin-silk / body / contour)
 
 **工具: `tools/ic_package_detect/detect_ic.py`(CLI, 方法+实测值见其 README)。**
 
@@ -152,7 +158,7 @@ pdftoppm -r 600 -png xx-top.pdf top600
 
 
 
-## 5D. 旋转扫描: 竖排丝印位号必杀技 (2026-09-10, Q27 实战验证)
+## 5d. 旋转扫描: 竖排丝印位号必杀技
 
 **问题**: bot 视图部分位号丝印是**竖排文字**(旋转 90° 印刷, 如 BPF2 条带 C124-C162、Q27),
 0° OCR 完全读不到 → 曾被误判"标签不可读"。
@@ -168,7 +174,7 @@ pdftoppm -r 600 -png xx-top.pdf top600
   BPF2 级间条带 18 个位号(C124…C162/C222/C164/C286/R90/R93/R101/R128/R129/R76/R233/C108/C245/C293)。
 - 后续"标签不可读"结论前, 先跑一轮 90/270° 旋转扫描再放弃。
 
-## 6. 视图方向(mirror)判断 (2026-09-10 修正)
+## 6. 视图方向(mirror)判断
 
 - **bot 视图(9-4)是 top 视图的 X 镜像(左右翻转): top_equiv_x = 3509 - bot_x, y 不变**(300dpi)
 - 证据(10项功能聚类一致性, 详见 top_pcb.json view_mapping):
@@ -193,7 +199,7 @@ pdftoppm -r 600 -png xx-top.pdf top600
   `svg_runs/`=SVG 渲染归档(2026-09-15 从 annot/ 提升至项目根);
 - 临时中间件放 `/tmp/opencode/`(600dpi 大图等),网表 JSON 里记录其路径。
 
-## 8. 标注与数据层(2026-09-10 新增)
+## 8. 标注与数据层
 
 - **原理图/PCB 标注首选 SVG 分层**(`tools/annotate_svg_flow/`): 仿
   `example/talkabout-bot.svg` 分层原则; 底图 base64 内嵌+图层锁定;
@@ -218,3 +224,228 @@ pdftoppm -r 600 -png xx-top.pdf top600
    与 `nettable/top_pcb.json`、`nettable/top_designators.json`;
    旧的块级 `annotate_rx_flow.py` 仅作备留;
 5. 所有视觉读数用第二次独立放大裁剪复核,避免幻觉。
+
+## 10. 小工具创建规范
+工具创建规范(位置/命名/readme/CLI/检查清单)见 architecture.md §5.6-5.11。
+
+## 11. 坐标数据验证方法
+
+**核心原则**: 数据错的概率 > 渲染错的概率。任何标注流程必须是
+**"先验证数据，再渲染"**，否则一错全错。
+
+### 11.1 反例 (v10 错位案例)
+
+2026-09-15 修复 v10 RX flow 时发现:
+- 用了 v8 时代的坐标 (1646, 1159) (F13)
+- 但 v8 坐标来自**300dpi 图像** OCR, v10 渲染到 **600dpi 底图**
+- 300dpi → 600dpi 直接嵌入 → 实际渲染的 F13 位置是 v8 的 2 倍偏移
+- 用工具 `verify_anchor.py` 验证: 在 v10 给的坐标处裁切 PCB 图, OCR 找不到 F13
+
+### 11.2 正解: verify_anchor 自检
+
+工具: `tools/verify_anchor/verify_anchor.py` (新建)
+
+**核心思想**: 坐标可能错位, 唯一权威验证 = **回到 PCB 母图, 裁切坐标周围, 重新 OCR, 看是否识别出相同 refdes**。
+
+算法 (回环校验):
+```
+for ref, x, y in coords:
+    crop = PCB.crop((x-w/2, y-h/2, x+w/2, y+h/2))
+    crop.upscale(2x)  # OCR 需更大字体
+    ocr_texts = ai_refdes_ocr(crop)
+    if ref in ocr_texts or ref prefix in ocr_texts:
+        → match (坐标正确)
+    else:
+        → mismatch (坐标错位)
+```
+
+### 11.3 验证流程 (OCR 工具产出索引后必走)
+
+1. **OCR 跑完一轮** (如 `ai_refdes_ocr.py` 跑 `pcb-top-600-1.png`)
+2. **聚合**: 从 `raw_stage1` + `raw_stage2` 聚合 refdes → components_index.json
+3. **校验 (新)**: 用 `verify_anchor.py` 对**每个关键 refdes** 做自检
+4. **mismatch 处理**:
+   - 重新跑 OCR (换引擎/参数)
+   - 检查缩放/坐标变换是否正确
+   - 检查母图是否最新版本
+   - 标 `not_located` 不画主流程
+5. **match 后才渲染**: rx_flow / svg 等下游
+
+### 11.4 关键尺寸参数 (经验值)
+
+- `crop_size`: 300x200 (太小→字符不全, 太大→邻接器件混入)
+- `upscale`: 2x (300x200 → 600x400, 让 OCR 看到清晰字)
+- `OCR stage1 tile`: 500, overlap=100 (单 tile 模式, 不需要 grid)
+- `engines`: `v5s,v4` (灵敏度+保守双引擎)
+
+### 11.5 完整命令
+
+```bash
+# 验证 v10 关键节点 (示例)
+python3 tools/verify_anchor/verify_anchor.py \
+    --pcb projects/icom2200h/render/pcb-top-600-1.png \
+    --coords "(1277,1489)=J11 (1646,1159)=F13 (1547,1159)=F14 (1714,1385)=IC12 (1726,709)=D12 (1671,807)=D27 (1919,1094)=FI1 (1921,1345)=FI2" \
+    --crop-size 350x230 \
+    --fuzzy
+
+# 报告输出: report.json
+# 退出码 0=全部 match, 1=有 mismatch, 2=参数错
+```
+
+### 11.6 与 schema.md 的关系
+
+verify_anchor 是 schema.md §5B "数据溯源规范"的具体实施工具:
+- 每个 refdes 坐标必须**可验证** (回到母图 OCR 仍识别到)
+- 任何坐标变更必须先验证再入库
+- 不验证的坐标等同"临时数据", 应标 `validated: false`
+
+### 11.7 与 best_practices §10 的关系
+
+§10 定义"小工具创建规范" — verify_anchor 是该规范的典型应用:
+- 路径在 `tools/verify_anchor/`
+- readme.md (五要素设计文档)
+- 全参数 CLI 化
+- 头部 docstring 含 purpose/format/version/consumers
+
+## 12. WSL 调 Windows python.exe 跑 GPU OCR
+
+**场景**: 本机是 WSL2 Linux, 但 RapidOCR + onnxruntime-directml 必须 Windows
+原生才能跑 DirectML GPU 加速。WSL 内 Linux Python 没有 DML EP。
+
+### 12.1 路径问题 (根本原因)
+
+- WSL 路径: `/mnt/c/Users/radio/foo.png` (Linux 视角)
+- Windows 路径: `C:\Users\radio\foo.png` (Windows 视角)
+- Linux Python 看到 WSL 路径 ✓
+- **Windows Python 不认 WSL 路径** (`/mnt/c/...`) ✗
+- 反之 Windows 路径 (`C:\...`) 在 WSL Linux 里通常可读, 但 cmd.exe 拒绝从 UNC 路径启动
+  (报错: "UNC paths are not supported. Defaulting to Windows directory.")
+
+### 12.2 反例 (5 次踩坑模式)
+
+| # | 错误做法 | 症状 |
+|---|---|---|
+| 1 | `cmd.exe /c "cmd /c script.bat"` 从 WSL cwd | UNC paths are not supported |
+| 2 | bat 里直接传 `--img /mnt/c/Users/radio/foo.png` | Windows PIL `FileNotFoundError` |
+| 3 | bat 里 `cd /d C:\Users\radio\tools_full` 但 ai_refdes_ocr.py 不在 sys.path | `ModuleNotFoundError` |
+| 4 | 用 bash 的 `\"...\"` 转义嵌套 5 层 | 引号解析错乱 |
+| 5 | 子进程传 `cwd="C:\\Users\\radio"` (WSL 视角找不到 `C:\\`) | `FileNotFoundError: C:\\Users\\radio` |
+
+### 12.3 正解模式 (5 步)
+
+```bash
+# Step 1: 把要 Windows 访问的文件 cp 到 Windows 路径 (避免 UNC)
+cp /home/.../crop.png /mnt/c/Users/radio/verify_<ts>/crop.png
+# WSL 视角下, 该路径是 /mnt/c/Users/radio/verify_<ts>/crop.png
+# Windows 视角下, 是 C:\Users\radio\verify_<ts>\crop.png
+
+# Step 2: 写 bat 文件, 内容:
+#   - cd /d C:\Users\radio\tools_full (工具目录)
+#   - 用 python.exe -c "import sys; sys.path.insert(0, r'C:\Users\radio\tools_full'); from ai_refdes_ocr import main; sys.argv=..."
+
+# Step 3: bat 文件本身也放 Windows 路径 (不能用 /mnt/c/...)
+
+# Step 4: 从 WSL 用 cmd.exe /c 启动 (不传 cwd, 让 bat 自己 cd)
+cmd.exe /c "C:\\Users\\radio\\verify_<ts>\\run_ocr.bat"
+
+# Step 5: OCR 输出 JSON 也会在 C:\Users\radio\verify_<ts>\out\, 用 WSL 读时
+#          路径是 /mnt/c/Users/radio/verify_<ts>/out/*.json
+```
+
+### 12.4 关键点速记
+
+| 关键点 | 说明 |
+|---|---|
+| **bat 必须用 `cd /d` + `-c "import sys; sys.path.insert..."`** | ai_refdes_ocr.py 在 tools_full/ 下, 必须 sys.path 加 |
+| **.bat 文件放 Windows 路径** | 不能 /mnt/c/... (cmd 拒绝 UNC) |
+| **OCR 输入输出图片 cp 到 Windows 路径** | PIL/onnxruntime 不认 /mnt/c/... |
+| **cmd.exe /c 不传 cwd** | 让 bat 自己 cd /d, 避免 WSL UNC cwd |
+| **stdout/stderr 重定向到 log.txt** | 避免中文 UnicodeEncodeError |
+
+### 12.5 反例: 不要这样做
+
+```python
+# ❌ 在 WSL cwd 下直接 cmd.exe /c (UNC 问题)
+subprocess.run(["cmd.exe", "/c", "script.bat"], cwd="/home/radio")
+
+# ❌ bat 里传 WSL 路径给 Windows python
+python.exe ai_refdes_ocr.py --img /mnt/c/Users/radio/crop.png  # FileNotFoundError
+
+# ❌ Windows Python 找不到脚本 (sys.path 没加)
+python.exe C:\Users\radio\tools_full\ai_refdes_ocr.py  # ModuleNotFoundError
+
+# ❌ 在 Linux bash 用 5 层嵌套引号
+cmd.exe /c "\"C:\\Users\\radio\\ocr_gpu_venv\\Scripts\\python.exe\" \"C:\\Users\\radio\\tools_full\\ai_refdes_ocr.py\" --img \\\"/mnt/c/...\\\"\"  # 解析错乱
+```
+
+### 12.6 验证工具: `tools/verify_anchor/`
+
+完整实现了 §12.3 模式 + OCR 验证 + match/mismatch 报告。
+详见 `tools/verify_anchor/readme.md`。
+
+### 11.8 真实案例: v10 错位 2x 教训
+
+**症状**: v10 渲染后用户报告 "F13, F14 位置根本不对"。
+
+**根因**: v10 用了 v8 时代的坐标 (1646, 1159) (F13)。v8 来自 300dpi 全图 OCR,
+**数值是 300dpi 像素** (1646, 1159 = PCB 上 ~5.5 inch x ~3.9 inch)。
+但 v10 渲染到 **600dpi 底图** (5100x6600), 把 300dpi 数值直接当 600dpi 用:
+- 1646 / 5100 ≈ 32% 横坐标 → 实际位置在板中央偏右, 不是 PCB 的 F13 真位置
+- OCR v12 (600dpi 全图, DML 双引擎) 找到 J11 (2556, 2978), 与 v10 的 (1277, 1489) 比例 = 2.00
+
+**教训**:
+1. **跨 DPI 空间坐标不能直接嵌入**, 必须按 scale 转换 (300dpi → 600dpi 应 ×2)
+2. **从历史数据继承坐标时**, 必须验证 src_dpi 和 tgt_dpi 是否一致
+3. **渲染前必须 verify_anchor 自检**, 在 v10 坐标处裁切 PCB 图, OCR 跑一次, 看识别结果
+4. **板边铆钉校验是必要的**: J11 (2556, 2978) 在 OCR 找到的位置, 但 y=2978 超板边 y=2929,
+   仍在板上标签区(印刷区 label 237 = (2572-3290, 2966-3276))
+
+### 11.9 v11 修复方案
+
+**流程**:
+1. 跑 OCR v12 (Windows DML, 600dpi 全图, v4+v5s 双引擎) → 144 hits, 47 agree
+2. 用 OCR 真实坐标 (而非历史坐标) 写 wpts_rx_top_v11.json
+3. F13/F14/IC12/Q27/IC4/D23 OCR 仍没找到 → 标"待 verify_anchor"虚位, 不作主流程锚点
+4. 红点聚类精度 0px (renderer 渲染位置完全落在 OCR 报告位置)
+
+**验证方法**: 红点聚类 (scipy.ndimage.label) 找红色像素的中心, 应等于 OCR 报告的 (cx, cy)。
+
+### 11.10 ocr_runs 目录位置
+
+**症状**: 仓库根出现 `ocr_runs/` 目录, 违反 architecture.md §0 (ocr_runs 必须在 `projects/<机型>/ocr_runs/`)。
+
+**根因**: Windows OCR bat 文件 `--runs-dir` 用了相对路径 `ocr_runs/<sub>`, 而 `cmd.exe` 的当前目录 (cwd) 是 `C:\Users\radio\tools_full` (由 bat 里的 `cd /d` 切了), 但 Python 子进程可能仍以 Windows 默认 cwd 启动, 导致 OCR JSON 写到 `C:\Users\radio\icom2200h\ocr_runs\...` (这是 Windows 工作区, OK) **或** 偶尔落到仓库根 `ocr_runs/` (如果 cmd cwd 不是 Windows home)。
+
+**修复**: bat 文件 `--runs-dir` 必须用**绝对 Windows 路径** `C:\Users\radio\icom2200h\ocr_runs\<sub>`, 不允许相对路径。
+
+**已修**: 所有 bat 文件 (`run_top_full.bat`, `run_top600_v12.bat`, `run_bot600_v12.bat` 等) 都改为绝对路径。
+
+**用户要求保留的目录位置**:
+- **Windows OCR 工作区**: `C:\Users\radio\icom2200h\ocr_runs\` (bat 输出实际写到这, 方便 Windows python 直接读)
+- **仓库规范目录**: `projects/icom2200h/ocr_runs/` (git 不追踪, 仅作为 WSL 视角的镜像位置)
+- **不要**在仓库根创建 `ocr_runs/` 或 `render/` `annot/` 等任何规范目录的子集
+
+### 11.11 PCB OCR 常见误识别 (1↔I, 0↔O 等)
+
+**症状**: OCR v12 把 PCB top 上的 **F13 误识别为 FI3**, **F14 误识别为 FI4**
+(数字 `1` 被识别成大写 `I`)。
+
+**根因**: PCB 丝印字体小 + 印刷质量差异, OCR 模型在低置信度时容易:
+- `1` ↔ `I` (最常见)
+- `0` ↔ `O`
+- `5` ↔ `S`
+- `B` ↔ `8`
+- `Q` ↔ `O`
+
+**程序内化修正**: `MISREAD_MAP` + `fix_misread()` 实现见 `tools/ai_ocr_eval/ai_refdes_ocr.py`。
+
+**手动修正案例**:
+- OCR "FI3" @ (3292, 2319) → 修正为 "F13" (chain_order 里有 F13)
+- OCR "FI4" @ (3094, 2319) → 修正为 "F14" (chain_order 里有 F14)
+- OCR "FI1" @ (3840, 2188) → 不修正 (chain_order 里有 FI1, 这是真值)
+- OCR "FI2" @ (3843, 2691) → 不修正 (FI2 是真值)
+
+**规则**:
+- **OCR 输出永远不可信** (含 1↔I 等误识别), 必须用 chain_order 上下文校正
+- **校正后必须 verify_anchor 验证** (裁切+OCR 自检)
+- **校正写入 _meta.correction**: 保留原始 OCR 文本, 标记修正原因, 可追溯
