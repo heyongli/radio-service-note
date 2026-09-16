@@ -84,8 +84,36 @@ def draw_text_with_halo(draw, pos, text, fill, font, halo_color=(255, 255, 255, 
     draw.text(pos, text, fill=fill, font=font)
 
 
-def draw_arrow(draw, x1, y1, x2, y2, color, width=5, head_len=36, head_angle=30):
-    draw.line([(x1, y1), (x2, y2)], fill=color, width=width, joint="curve")
+def draw_dashed_line(draw, p1, p2, color, width=5, dash=14, gap=8, alpha=140):
+    """Draw a dashed line between two points with transparency."""
+    x1, y1 = p1
+    x2, y2 = p2
+    dx, dy = x2 - x1, y2 - y1
+    length = math.hypot(dx, dy)
+    if length == 0:
+        return
+    ux, uy = dx / length, dy / length
+    # Apply reduced alpha for dashed lines
+    if len(color) == 4:
+        dash_color = (color[0], color[1], color[2], alpha)
+    else:
+        dash_color = color + (alpha,)
+    pos = 0
+    while pos < length:
+        end = min(pos + dash, length)
+        sx = x1 + ux * pos
+        sy = y1 + uy * pos
+        ex = x1 + ux * end
+        ey = y1 + uy * end
+        draw.line([(sx, sy), (ex, ey)], fill=dash_color, width=width)
+        pos += dash + gap
+
+
+def draw_arrow(draw, x1, y1, x2, y2, color, width=5, head_len=36, head_angle=30, dash=False):
+    if dash:
+        draw_dashed_line(draw, (x1, y1), (x2, y2), color, width)
+    else:
+        draw.line([(x1, y1), (x2, y2)], fill=color, width=width, joint="curve")
     dx, dy = x2 - x1, y2 - y1
     dist = math.hypot(dx, dy)
     if dist < head_len * 2:
@@ -105,15 +133,14 @@ def draw_arrow(draw, x1, y1, x2, y2, color, width=5, head_len=36, head_angle=30)
 def draw_arrowed_line(draw, points, color, width=8, head_len=36, dash=False):
     if len(points) < 2:
         return
-    if dash:
-        for i in range(len(points) - 1):
-            draw.line([points[i], points[i + 1]], fill=color, width=width, joint="curve")
-    else:
-        for i in range(len(points) - 1):
-            if i == len(points) - 2:
-                draw_arrow(draw, points[i][0], points[i][1],
-                           points[i + 1][0], points[i + 1][1],
-                           color, width, head_len)
+    for i in range(len(points) - 1):
+        if i == len(points) - 2:
+            draw_arrow(draw, points[i][0], points[i][1],
+                       points[i + 1][0], points[i + 1][1],
+                       color, width, head_len, dash=dash)
+        else:
+            if dash:
+                draw_dashed_line(draw, points[i], points[i + 1], color, width)
             else:
                 draw.line([points[i], points[i + 1]], fill=color, width=width, joint="curve")
 
@@ -217,9 +244,15 @@ def render_png(wpts, base, comp_idx, args):
             lpos = item.get("lpos", "")
             note = item.get("note", "")
             inferred = label.endswith("?") or item.get("inferred", False)
+            mark_type = item.get("mark_type", "")
             if px:
                 x, y = px
-                if dot:
+                if mark_type == "via":
+                    # Cross-side destination: red hollow circle (via), thick outline
+                    r = 18
+                    draw.ellipse([x - r, y - r, x + r, y + r],
+                                 fill=C['white'], outline=C['red'], width=6)
+                elif dot:
                     if inferred:
                         # Bot component: via icon (circle with cross)
                         r = 16
@@ -244,8 +277,8 @@ def render_png(wpts, base, comp_idx, args):
                         ly -= fs + 12
                     elif lpos == "ur": lx += 28; ly -= fs + 12
                     elif lpos == "dr": lx += 28; ly += 22
-                    font = load_font(fs, bold=inferred)
-                    fill = C['purple'] if inferred else C['red']
+                    font = load_font(fs, bold=inferred or mark_type == "via")
+                    fill = C['red'] if mark_type == "via" else (C['purple'] if inferred else C['red'])
                     draw_text_with_halo(draw, (lx, ly), label,
                                         fill=fill, font=font,
                                         halo_color=C_WHITE,
@@ -505,7 +538,8 @@ def main():
     ap.add_argument("--wpts", required=True)
     ap.add_argument("--components")
     ap.add_argument("--out-png", default="rx_flow_top.png")
-    ap.add_argument("--out-svg", default="rx_flow_top.svg")
+    ap.add_argument("--out-svg", default=None,
+                    help="SVG 输出路径; 省略则与 --out-png 同目录同名 (.svg)")
     # === 颜色 (全部 CLI) ===
     ap.add_argument("--color-green", default=DEFAULTS['color_green'])
     ap.add_argument("--color-green-dash", default=DEFAULTS['color_green_dash'])
@@ -533,6 +567,8 @@ def main():
     ap.add_argument("--skip-confirm-boxes", action="store_true",
                     help="跳过 components_index 的青色确认框 (避免视觉噪音)")
     args = ap.parse_args()
+    if args.out_svg is None:
+        args.out_svg = str(Path(args.out_png).with_suffix(".svg"))
     render_rx_flow(args.pcb, args.wpts, args.out_svg, args.out_png, args.components, args)
 
 

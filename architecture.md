@@ -257,7 +257,7 @@ components_index.json (合并矩形+圆形结果)
 - **紫色空心圆+十字**: bot view 元器件 (过孔图标), 标签用紫色
 - **箭头**: 每段连线终点必须有箭头
 
-### 4.4 标注规范与 bot 组件规则
+### 4.4 信号流标注规范
 
 **bot 组件标注**:
 - bot view 组件在 top view 上用 **过孔图标** (空心圆+十字) 标注
@@ -266,15 +266,16 @@ components_index.json (合并矩形+圆形结果)
 - 连线用 **虚线** 表示背面走线
 
 **连线规范**:
-- **横平竖直**: 所有连线必须水平或垂直, 拐点用 `through` 字段
-- **避免交叉**: 不同信号路径不得相交
+- **横平竖直**: 所有连线尽量水平或垂直, 拐点用 `through` 字段
+- **避免交叉**: 不同信号路径尽量不相交
 - **走线优先级**: 先垂直再水平 (或反过来), 选择不交叉的路径
 - **折返垂直段**: 向左再向右 (或反之) 必须先走一段垂直线, 避免水平线重叠
-- **箭头**: 每段连线终点必须有箭头
+- **箭头**: 每段连线终点必须有箭头，跟随信号流方向
+- **同面 vs 跨面**: 同面连线用实线; 跨面连线用虚线 + 过孔图标 (圆+十字)
 
 **标记规范**:
-- top 组件: 红色实心圆点 + 黑心, 标签红色
-- bot 组件: 紫色空心圆 + 十字 (过孔图标), 标签紫色
+- **同面** (如 top→top): 无圆点, 无过孔, 实线
+- **到达另一面** 放一个小红圈中空，意思是这是个过孔（via），如 bot→top
 - 标签位置: 用 `lpos` 控制, 避免与连线重叠
 
 **输出要求**:
@@ -409,28 +410,39 @@ tools/<tool_name>/
 
 ---
 
-## 12. 经验教训
+## 13. 全流程工具链
 
-### 12.1 坐标系踩坑
+将探索阶段验证过的方法和原则固化为可复用工具, 确保流程一致、可追溯。
 
-**v10/v11 错位根因**: F13/F14 的 v8 坐标是从 top view OCR 找到的, 但 F13/F14 实际只在 bot view 有丝印。教训: **坐标必须标注 view, 不能跨 view 共享**。
+### 13.1 OCR 识别
+| 工具 | 路径 | 用途 |
+|---|---|---|
+| `rectangle_locator.py` | `tools/rectangle_locator/` | 矩形轮廓检测, 定位 refdes 标号 |
+| `circle_locator.py` | `tools/circle_locator/` | 圆形轮廓检测, 补充识别 |
+| `ic_ocr_scan_dml.py` | `tools/ic_ocr_scan/` | Windows DirectML GPU 加速 OCR |
 
-**v9 渲染严重错位**: board_tiles 是 600dpi 切的, 但 OCR 用了 `--img-dpi 200`, 坐标直接相加导致偏移 3 倍。教训: **不同 DPI 空间只能比例映射, 不能直接相加**。
+### 13.2 信号流渲染
+| 工具 | 路径 | 用途 |
+|---|---|---|
+| `route_flow.py` | `tools/route_flow/` | 信号流自动路由, 生成 waypoints |
+| `render_rx_flow.py` | `tools/render_rx_flow/` | 渲染 RX/TX 信号流标注图 |
 
-### 12.2 OCR 识别踩坑
+**waypoints (wpts)**: 描述信号流路径的 JSON 文件, 是渲染的唯一输入。每条记录包含起点
+ `px`、拐点 `through`、线型 `dash`、标记 `mark_type` 等。所有坐标统一在 600dpi top view 空间。
 
-**v6 幻觉问题**: PP-OCRv6 small/mobile 容易产生假位号 (IC169/IR78)。教训: **默认用 v4 server, v6 仅作交叉验证**。
+**route_flow.py 算法** (固化 §4.4 标注规范):
+1. **横平竖直**: 所有线段水平或垂直, 候选路径含折返垂直段 (先垂直再水平 / 先水平再垂直 / 经 y 偏移中转)
+2. **避免交叉**: 评分 `crossings × 10 + label_hits × 5`, 逐条路由, 后续路径避开已有路径
+3. **折返垂直段**: 生成带 y 偏移 (±100/±200/±400) 的候选路径, 自动插入垂直段
+4. **标签避让**: 按 `lpos` 定义 keep-out 矩形, 路径不穿过标号文字区域
+5. **bot 镜像**: bot 组件坐标自动 mirror 到 top view: `top_x = board_center_x + (board_center_x - bot_x)`
+6. **同面/跨面**: 同面 (top→top) 输出实线; 跨面 (bot→top) 输出虚线 + via 标记
+7. **via 标记**: 跨面目标处标红色空心圆 (过孔), wpts 中 `mark_type: "via"`
 
-**全页 OCR 无效**: 600dpi 全页扫仅 1-5 个命中, 丝印字太小。教训: **必须按 200px tile 切块才出效果**。
+**render_rx_flow.py** (固化渲染规则):
+- 实线/虚线: 虚线用 semi-transparent 绘制, 避免遮挡 PCB 底图
+- via 标记: 红色空心圆 (width=12, r=18)
+- 箭头: 每段连线终点, 跟随信号流方向
 
-### 13.3 圆形检测踩坑
-
-**pad 噪声**: 圆形检测 1791 个中大部分是铜 pad 圆角。教训: **min-diameter 需要 120+ 才能过滤小 pad, 但仍有大量噪声**。
-
-**IC 被间接发现**: IC 附近有圆形 pad, OCR 在圆形裁切中读到了 IC 丝印。教训: **圆形检测是补充手段, 不是独立方法**。
-
-### 13.4 工具协作踩坑
-
-**WSL→Windows 路径**: WSL 的 `/mnt/c/` UNC 路径 Windows Python 无法访问。教训: **必须把文件 cp 到 Windows 原生路径, 用 `cd /d` 启动**。
-
-**DirectML 假阳性**: WSL 中 `use_dml=True` 不报错但 GPU 负载为 0。教训: **必须用 Windows 原生 Python 运行 DML**。
+**输入**: JSON config (components 坐标/view/lpos + connections 列表)
+**输出**: wpts JSON, 与 `render_rx_flow.py` 兼容

@@ -449,3 +449,29 @@ cmd.exe /c "\"C:\\Users\\radio\\ocr_gpu_venv\\Scripts\\python.exe\" \"C:\\Users\
 - **OCR 输出永远不可信** (含 1↔I 等误识别), 必须用 chain_order 上下文校正
 - **校正后必须 verify_anchor 验证** (裁切+OCR 自检)
 - **校正写入 _meta.correction**: 保留原始 OCR 文本, 标记修正原因, 可追溯
+
+## 13. 经验教训
+
+### 13.1 坐标系踩坑
+
+**v10/v11 错位根因**: F13/F14 的 v8 坐标是从 top view OCR 找到的, 但 F13/F14 实际只在 bot view 有丝印。教训: **坐标必须标注 view, 不能跨 view 共享**。
+
+**v9 渲染严重错位**: board_tiles 是 600dpi 切的, 但 OCR 用了 `--img-dpi 200`, 坐标直接相加导致偏移 3 倍。教训: **不同 DPI 空间只能比例映射, 不能直接相加**。
+
+### 13.2 OCR 识别踩坑
+
+**v6 幻觉问题**: PP-OCRv6 small/mobile 容易产生假位号 (IC169/IR78)。教训: **默认用 v4 server, v6 仅作交叉验证**。
+
+**全页 OCR 无效**: 600dpi 全页扫仅 1-5 个命中, 丝印字太小。教训: **必须按 200px tile 切块才出效果**。
+
+### 13.3 圆形检测踩坑
+
+**pad 噪声**: 圆形检测 1791 个中大部分是铜 pad 圆角。教训: **min-diameter 需要 120+ 才能过滤小 pad, 但仍有大量噪声**。
+
+**IC 被间接发现**: IC 附近有圆形 pad, OCR 在圆形裁切中读到了 IC 丝印。教训: **圆形检测是补充手段, 不是独立方法**。
+
+### 17.4 工具协作踩坑
+
+**WSL→Windows 路径**: WSL 的 `/mnt/c/` UNC 路径 Windows Python 无法访问。教训: **必须把文件 cp 到 Windows 原生路径, 用 `cd /d` 启动**。
+
+**DirectML 假阳性**: WSL 中 `use_dml=True` 不报错但 GPU 负载为 0。教训: **必须用 Windows 原生 Python 运行 DML**。
