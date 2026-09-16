@@ -1,0 +1,178 @@
+[
+  {
+    "_meta": {
+      "purpose": "RX flow waypoints v16 - horizontal/vertical lines, no crossing",
+      "format": "JSON list [_meta, line/mark entries]",
+      "version": "16",
+      "consumers": ["tools/render_rx_flow.py"],
+      "view": "pcb_top_600dpi",
+      "tgt_image": "projects/icom2200h/render/pcb-top-600-1.png",
+      "tgt_image_dpi": 600,
+      "series_only": true,
+      "note": "Bot components (Q27/IC4/Q16) shown as via markers, dashed lines"
+    }
+  },
+  {
+    "layer": "rx",
+    "kind": "line",
+    "px": [3676, 675],
+    "through": [[3676, 1948], [3438, 1948]],
+    "dash": true,
+    "label": "",
+    "lpos": "d",
+    "fs": 32,
+    "dot": false
+  },
+  {
+    "layer": "rx",
+    "kind": "line",
+    "px": [3438, 1948],
+    "through": [[3598, 1948], [3598, 2345]],
+    "dash": true,
+    "label": "",
+    "lpos": "r",
+    "fs": 32,
+    "dot": false
+  },
+  {
+    "layer": "rx",
+    "kind": "line",
+    "px": [3598, 2345],
+    "through": [[3290, 2345], [3290, 2318]],
+    "dash": false,
+    "label": "",
+    "lpos": "d",
+    "fs": 32,
+    "dot": false
+  },
+  {
+    "layer": "rx",
+    "kind": "line",
+    "px": [3290, 2318],
+    "through": [[3092, 2318], [3092, 2319]],
+    "dash": false,
+    "label": "",
+    "lpos": "u",
+    "fs": 32,
+    "dot": false
+  },
+  {
+    "layer": "rx",
+    "kind": "line",
+    "px": [3092, 2319],
+    "through": [[3092, 2500], [3518, 2500], [3518, 2320]],
+    "dash": true,
+    "label": "",
+    "lpos": "d",
+    "fs": 28,
+    "dot": false
+  },
+  {
+    "layer": "rx",
+    "kind": "line",
+    "px": [3518, 2320],
+    "through": [[3840, 2320], [3840, 2188]],
+    "dash": true,
+    "label": "",
+    "lpos": "r",
+    "fs": 28,
+    "dot": false
+  },
+  {
+    "layer": "rx",
+    "kind": "line",
+    "px": [3840, 2188],
+    "through": [[3843, 2188], [3843, 2691]],
+    "dash": false,
+    "label": "",
+    "lpos": "r",
+    "fs": 28,
+    "dot": false
+  },
+  {
+    "layer": "rx",
+    "kind": "line",
+    "px": [3843, 2691],
+    "through": [[3555, 2691], [3555, 2719]],
+    "dash": false,
+    "label": "",
+    "lpos": "d",
+    "fs": 28,
+    "dot": false
+  },
+  {
+    "layer": "marks",
+    "px": [3676, 675],
+    "label": "ANT",
+    "dot": true,
+    "fs": 44,
+    "lpos": "ur"
+  },
+  {
+    "layer": "marks",
+    "px": [3438, 1948],
+    "label": "Q27",
+    "dot": true,
+    "fs": 36,
+    "lpos": "ul",
+    "inferred": true
+  },
+  {
+    "layer": "marks",
+    "px": [3598, 2345],
+    "label": "IC4",
+    "dot": true,
+    "fs": 36,
+    "lpos": "ur",
+    "inferred": true
+  },
+  {
+    "layer": "marks",
+    "px": [3290, 2318],
+    "label": "F13",
+    "dot": true,
+    "fs": 48,
+    "lpos": "dr"
+  },
+  {
+    "layer": "marks",
+    "px": [3092, 2319],
+    "label": "F14",
+    "dot": true,
+    "fs": 48,
+    "lpos": "dl"
+  },
+  {
+    "layer": "marks",
+    "px": [3518, 2320],
+    "label": "Q16",
+    "dot": true,
+    "fs": 36,
+    "lpos": "dr",
+    "inferred": true
+  },
+  {
+    "layer": "marks",
+    "px": [3840, 2188],
+    "label": "FI1",
+    "dot": true,
+    "fs": 42,
+    "lpos": "ur"
+  },
+  {
+    "layer": "marks",
+    "px": [3843, 2691],
+    "label": "FI2",
+    "dot": true,
+    "fs": 42,
+    "lpos": "ur"
+  },
+  {
+    "layer": "marks",
+    "px": [3555, 2719],
+    "label": "IC12",
+    "dot": true,
+    "fs": 42,
+    "lpos": "ur"
+  }
+]
