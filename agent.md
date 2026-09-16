@@ -1,6 +1,7 @@
 
 * 开始任务前先 load best_practices.md, 按其中的已验证结论操作, 避免重复踩坑
-* git 提交纪律 : 不要自动 commit; 等用户明确要求 commit 才执行。
+* git 提交纪律 : 不要自动 commit; 等用户明确要求 commit 执行。
+* git 提交纪律 : 永远不要 `git add -f`, 尊重 .gitignore 规则, projects/ 等目录不进 git。
 * 未确认的坐标要记录并在渲染时忽略 不得臆造坐标
 
 
