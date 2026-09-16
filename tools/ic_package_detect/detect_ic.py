@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""tools/ic_package_detect/detect_ic.py — IC 封装检测
+purpose: 从 PCB 图识别 IC 封装类型 (QFP/SOIC/DIP 等)
+format: Python 3 + OpenCV
+version: 0.2.0 (2026-09-15)
+consumers: 元器件索引的封装字段"""
+
 """IC 封装定位工具: 三种方法, 从强到弱.
 
 方法 pin-silk (首选, 数据驱动):
@@ -27,6 +33,7 @@ import os
 import re
 import subprocess
 import tempfile
+from pathlib import Path
 
 
 def pdf_number_words(pdf):
@@ -178,6 +185,90 @@ def method_contour(img, near, radius=400):
     return best[1] if best else None
 
 
+def method_crop_ocr(crops_index_paths, refdes_list, categories=None, scale=4, local_ocr=False):
+    """矩形+圆形裁切 + 旋转 OCR + refdes 匹配 → IC 本体框.
+
+    原理: rectangle_locator / circle_locator 已检出全板矩形与圆形并分类。
+    对每个裁切做 0/90/180/270 旋转 OCR, 若读到已知 refdes,
+    则该裁切的 bbox 即 IC 本体坐标+尺寸。
+
+    可靠性/性能: 默认只用预计算的 ic_ocr_results.json (DML OCR, 可靠且快);
+    本地 rapidocr 兜底仅当 --local-ocr 显式开启 (慢, 全圆扫可能超时).
+
+    crops_index_paths: rectangle/circle 的 crops_index.json 列表 (可混合 top/bot)
+    refdes_list: 已知 refdes (如 chain_order / components_index 里的 IC)
+    categories: 只扫描这些类别 (None = 全部)
+    """
+    import cv2
+    from pathlib import Path as _P
+
+    wanted = {rd.upper() for rd in refdes_list}
+    results = []
+    for cip in crops_index_paths:
+        with open(cip) as f:
+            idx = json.load(f)
+        # 兼容 rectangles / circles 两种键
+        items = idx.get("rectangles") or idx.get("circles") or []
+        vdir = str(_P(cip).parent).lower()
+        view = "bot" if "bot" in vdir else "top"
+
+        # 预计算 DML OCR 结果 (可选, 可靠)
+        pre = {}
+        pre_path = _P(cip).parent / "ic_ocr_results.json"
+        if pre_path.exists():
+            with open(pre_path) as f:
+                pr = json.load(f)
+            for r in pr.get("results", []):
+                pre[r["idx"]] = r
+
+        ocr = None
+        for r in items:
+            cat = r.get("category")
+            if categories and cat not in categories:
+                continue
+            hit = None
+            # 1) 优先预计算 OCR
+            if r["idx"] in pre:
+                for o in pre[r["idx"]].get("ocr_all", []):
+                    if o["text"].strip().upper() in wanted:
+                        hit = (o["text"].strip().upper(), o.get("rot", 0), round(o.get("score", 0), 3))
+                        break
+            # 2) 本地 OCR 兜底 (显式开启才用)
+            if not hit and local_ocr and r.get("crop_file"):
+                if ocr is None:
+                    from rapidocr_onnxruntime import RapidOCR
+                    ocr = RapidOCR()
+                path = str(_P(cip).parent / r["crop_file"])
+                img = cv2.imread(path)
+                if img is not None:
+                    img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+                    for rot, code in [(0, None), (90, cv2.ROTATE_90_CLOCKWISE),
+                                      (180, cv2.ROTATE_180), (270, cv2.ROTATE_90_COUNTERCLOCKWISE)]:
+                        im = cv2.rotate(img, code) if code is not None else img
+                        tmp = str(_P(cip).parent / "_ocr_tmp.png")
+                        cv2.imwrite(tmp, im)
+                        res, _ = ocr(tmp)
+                        if not res:
+                            continue
+                        for t in res:
+                            txt = t[1].strip().upper()
+                            if txt in wanted:
+                                hit = (txt, rot, round(t[2], 3))
+                                break
+                        if hit:
+                            break
+            if hit:
+                bbox = r["bbox"]
+                cx, cy = (bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2
+                results.append(dict(refdes=hit[0], view=view, bbox=bbox,
+                                    center=[round(cx), round(cy)],
+                                    wh=r.get("wh", [bbox[2] - bbox[0], bbox[3] - bbox[1]]),
+                                    rot=hit[1], score=hit[2],
+                                    crop_file=r.get("crop_file"),
+                                    category=cat, src=str(cip)))
+    return results
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = ap.add_subparsers(dest="method", required=True)
@@ -192,6 +283,16 @@ def main():
     s3.add_argument("--img", required=True)
     s3.add_argument("--near", required=True)
     s3.add_argument("--radius", type=int, default=400)
+    s4 = sub.add_parser("crop-ocr", help="矩形+圆形裁切+旋转OCR+refdes匹配 → IC本体框 (首选)")
+    s4.add_argument("--crops", required=True,
+                    help="crops_index.json 路径, 逗号分隔 (可混合 rectangle/circle, top/bot)")
+    s4.add_argument("--refdes", required=True, help="已知 refdes, 逗号分隔 (如 IC4,IC12)")
+    s4.add_argument("--categories", default="ic",
+                    help="扫描的类别, 逗号分隔 (默认 ic; 留空=全部)")
+    s4.add_argument("--scale", type=int, default=4, help="OCR 放大倍数")
+    s4.add_argument("--local-ocr", action="store_true",
+                    help="对无预计算结果的裁切跑本地 rapidocr (慢)")
+    s4.add_argument("--out")
     args = ap.parse_args()
 
     if args.method == "pin-silk":
@@ -204,6 +305,15 @@ def main():
         x, y = (float(v) for v in args.near.split(","))
         r = method_body(args.img, (x, y), args.radius)
         print(json.dumps(r, indent=1) if r else "未检出")
+    elif args.method == "crop-ocr":
+        refdes = [v.strip() for v in args.refdes.split(",") if v.strip()]
+        cats = tuple(v.strip() for v in args.categories.split(",") if v.strip()) or None
+        crops = [v.strip() for v in args.crops.split(",") if v.strip()]
+        out = method_crop_ocr(crops, refdes, cats, args.scale, args.local_ocr)
+        print(json.dumps(out, indent=1, ensure_ascii=False))
+        print(f"# 匹配 {len(out)} 个 IC 本体")
+        if args.out:
+            json.dump(out, open(args.out, "w"), indent=1, ensure_ascii=False)
     else:
         x, y = (float(v) for v in args.near.split(","))
         r = method_contour(args.img, (x, y), args.radius)

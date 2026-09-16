@@ -1,10 +1,14 @@
-# route_flow.py -- Signal Flow Auto-Router
+# signal_flow_route.py -- Signal Flow Auto-Router
+
+> **必读**: 修改本工具前必须完整阅读本文档, 尤其是「连线规范」「评分函数」「输出格式」。
+> 算法固化了 architecture.md §4.4 标注规范, 任何改动不得破坏:
+> 同面/跨面虚实线、via 标记、IC 轮廓、平行线间距、标签避让。
 
 ## 文件清单
 | 文件 | 用途 |
 |---|---|
-| `route_flow.py` | 主程序: 根据坐标+连接关系自动规划路径 |
-| `readme.md` | 本文档 |
+| `signal_flow_route.py` | 主程序: 根据坐标+连接关系自动规划路径 |
+| `readme.md` | 本文档 (修改前必读) |
 
 ## 路由算法
 
@@ -16,7 +20,7 @@ config JSON 结构:
   "meta": {
     "purpose": "描述",
     "version": "1.0",
-    "consumers": ["tools/route_flow/route_flow.py"],
+    "consumers": ["tools/signal_flow_route/signal_flow_route.py"],
     "view": "pcb_top_600dpi"
   },
   "components": {
@@ -44,6 +48,9 @@ config JSON 结构:
 | `view` | string | 是 | `"top"` 或 `"bot"`, 标号在哪一面 |
 | `lpos` | string | 是 | 标号位置: `u/d/l/r/ul/ur/dl/dr` |
 | `fs` | int | 否 | 标号字号, 默认 36 |
+| `outline` | bool | 否 | `true` = flow 设计 IC, 标轮廓矩形 |
+| `outline_w` | int | 否 | 轮廓宽 (px), 默认 220 |
+| `outline_h` | int | 否 | 轮廓高 (px), 默认 160 |
 
 **connections 字段说明**:
 
@@ -54,9 +61,11 @@ config JSON 结构:
 
 连接顺序即信号流方向: `ANT → Q27 → IC4 → F13 → ...`
 
-### 坐标变换
-- bot 组件自动镜像到 top view: `top_x = board_center_x + (board_center_x - bot_x)`
-- 所有路径在 top view 坐标系中计算
+### 坐标约定
+
+- **config 坐标 = top-view 空间**: 所有组件坐标统一为 top view 坐标
+- **bot 组件**: config 创建时已从 bot 镜像到 top: `top_x = board_center_x + (board_center_x - bot_x)`, 创建后坐标不再变换
+- `view` 字段仅用于**虚线/via 判定** (跨面), 不做坐标变换
 
 ### 候选路径生成
 对每对连接点 `(p1, p2)`, 生成最多 8 条 Manhattan 候选路径:
@@ -67,9 +76,10 @@ config JSON 结构:
 ### 评分函数
 每条候选路径按以下加权评分, 取最低分:
 ```
-score = crossings × 10 + label_hits × 5
+score = crossings × 10 + proximity × 8 + label_hits × 5
 ```
 - **crossings**: 与已布线路径的交叉次数 (严格 T 形交叉才算)
+- **proximity**: 与已布线路径**平行且间距 < 40px** 的重叠次数 (避免水平线/垂直线视觉重叠)
 - **label_hits**: 路径穿过元器件标号文字区域的次数
 
 ### 标号避让 (Label Avoidance)
@@ -93,9 +103,17 @@ keep-out 矩形尺寸: `宽度 = len(name) × fs × 0.6 + margin`, `高度 = fs 
 
 ### 连线规范 (§4.4)
 - **横平竖直**: 所有线段水平或垂直
-- **同面** (top→top): 实线, 无标记
-- **跨面** (bot→top): 虚线, 目标处标红色空心圆 (via)
+- **同面/跨面**: 两端 view 相同 → 实线; view 不同 (top↔bot) → 虚线
+- **via 标记**: 跨面连接的**到达端**标红色空心圆, 表示过孔
 - **箭头**: 每段连线终点有箭头, 跟随信号流方向
+
+### IC 轮廓标注
+- config 中设 `"outline": true` 的组件 (flow 设计 IC) 标轮廓矩形
+- 轮廓尺寸: `outline_w` × `outline_h` (px, 600dpi)
+- 同面 (view=top): 红色实线矩形; 另一面 (view=bot): **紫色虚线矩形**
+- **坐标必须为 IC 本体中心, 非标签文字中心**; 未经封装检测确认的 IC **不画轮廓**
+  (遵循"未确认坐标不得臆造"原则)。IC12 因标签中心与本体不一致 (rect 索引 3555,2719
+  vs circle 索引 3281,2702), 本体未检出, 暂不标轮廓
 
 ### 输出格式
 
@@ -140,17 +158,20 @@ keep-out 矩形尺寸: `宽度 = len(name) × fs × 0.6 + margin`, `高度 = fs 
 | `px` | 元器件坐标 |
 | `label` | refdes 标号 |
 | `mark_type` | `"via"` = 跨面目标 (红色空心圆), 省略 = 无标记 |
+| `outline` | `true` = 画 IC 轮廓矩形 |
+| `outline_view` | `"top"` = 红色实线, `"bot"` = 紫色虚线 |
+| `outline_w/h` | 轮廓尺寸 (px) |
 
 ## 用法
 
 ```bash
 # 生成 wpts
-python3 tools/route_flow/route_flow.py \
+python3 tools/signal_flow_route/signal_flow_route.py \
   --config projects/icom2200h/nettable/rx_flow_config.json \
   --out projects/icom2200h/nettable/wpts_rx_auto.json
 
 # 生成 wpts + 预览图
-python3 tools/route_flow/route_flow.py \
+python3 tools/signal_flow_route/signal_flow_route.py \
   --config projects/icom2200h/nettable/rx_flow_config.json \
   --out projects/icom2200h/nettable/wpts_rx_auto.json \
   --out-png projects/icom2200h/annot/rx_flow_auto.png \
@@ -158,6 +179,6 @@ python3 tools/route_flow/route_flow.py \
 ```
 
 ## 扩展
-- 添加新机型: 复制 `rx_flow_config.json`, 修改 components + connections
+- 添加新机型: 复制 `projects/<机型>/nettable/rx_flow_config.json`, 修改 components + connections
 - 调整评分权重: 修改 `score()` 中 crossings/label_hits 的系数
 - 添加障碍物避让: 在 `count_label_hits` 中加入 PCB 板上禁区检测

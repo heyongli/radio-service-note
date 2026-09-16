@@ -3,6 +3,7 @@
 * git 提交纪律 : 不要自动 commit; 等用户明确要求 commit 执行。
 * git 提交纪律 : 永远不要 `git add -f`, 尊重 .gitignore 规则, projects/ 等目录不进 git。
 * 未确认的坐标要记录并在渲染时忽略 不得臆造坐标
+* 修改任何工具/程序前, 必须先完整阅读其 `readme.md`; 改动不得破坏 readme 中固化的原则并保持重要算法
 
 
 ## 项目介绍

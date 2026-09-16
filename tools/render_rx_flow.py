@@ -247,6 +247,23 @@ def render_png(wpts, base, comp_idx, args):
             mark_type = item.get("mark_type", "")
             if px:
                 x, y = px
+                # IC outline: 轮廓标注, 另一面用虚线
+                if item.get("outline"):
+                    ocx = item.get("outline_cx", x)
+                    ocy = item.get("outline_cy", y)
+                    ow = item.get("outline_w", 220)
+                    oh = item.get("outline_h", 160)
+                    other_side = item.get("outline_view", "top") == "bot"
+                    ocolor = C['purple'] if other_side else C['red']
+                    rect = [ocx - ow/2, ocy - oh/2, ocx + ow/2, ocy + oh/2]
+                    if other_side:
+                        # dashed rectangle outline
+                        pts = [(rect[0], rect[1]), (rect[2], rect[1]),
+                               (rect[2], rect[3]), (rect[0], rect[3]), (rect[0], rect[1])]
+                        for i in range(len(pts) - 1):
+                            draw_dashed_line(draw, pts[i], pts[i+1], ocolor, width=5)
+                    else:
+                        draw.rectangle(rect, outline=ocolor, width=5)
                 if mark_type == "via":
                     # Cross-side destination: red hollow circle (via), thick outline
                     r = 18

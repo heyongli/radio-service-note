@@ -420,24 +420,31 @@ tools/<tool_name>/
 | `rectangle_locator.py` | `tools/rectangle_locator/` | 矩形轮廓检测, 定位 refdes 标号 |
 | `circle_locator.py` | `tools/circle_locator/` | 圆形轮廓检测, 补充识别 |
 | `ic_ocr_scan_dml.py` | `tools/ic_ocr_scan/` | Windows DirectML GPU 加速 OCR |
+| `detect_ic.py` | `tools/ic_package_detect/` | IC 封装定位: 矩形+圆形裁切+旋转OCR+refdes 匹配 → 本体框 |
+
+**detect_ic.py crop-ocr (IC 本体定位首选)**: 配合 rectangle/circle_locator 的裁切,
+旋转 OCR 读到已知 refdes 的裁切 bbox 即 IC 本体。默认用预计算 DML OCR 结果,
+`--local-ocr` 兜底。**本体中心 ≠ 标签文字中心**, 轮廓框必须用本体 bbox。
 
 ### 13.2 信号流渲染
 | 工具 | 路径 | 用途 |
 |---|---|---|
-| `route_flow.py` | `tools/route_flow/` | 信号流自动路由, 生成 waypoints |
+| `signal_flow_route.py` | `tools/signal_flow_route/` | 信号流自动路由, 生成 waypoints |
 | `render_rx_flow.py` | `tools/render_rx_flow/` | 渲染 RX/TX 信号流标注图 |
 
 **waypoints (wpts)**: 描述信号流路径的 JSON 文件, 是渲染的唯一输入。每条记录包含起点
  `px`、拐点 `through`、线型 `dash`、标记 `mark_type` 等。所有坐标统一在 600dpi top view 空间。
 
-**route_flow.py 算法** (固化 §4.4 标注规范):
+**signal_flow_route.py 算法** (固化 §4.4 标注规范):
 1. **横平竖直**: 所有线段水平或垂直, 候选路径含折返垂直段 (先垂直再水平 / 先水平再垂直 / 经 y 偏移中转)
-2. **避免交叉**: 评分 `crossings × 10 + label_hits × 5`, 逐条路由, 后续路径避开已有路径
+2. **避免交叉**: 评分 `crossings × 10 + proximity × 8 + label_hits × 5`, 逐条路由, 后续路径避开已有路径
 3. **折返垂直段**: 生成带 y 偏移 (±100/±200/±400) 的候选路径, 自动插入垂直段
-4. **标签避让**: 按 `lpos` 定义 keep-out 矩形, 路径不穿过标号文字区域
-5. **bot 镜像**: bot 组件坐标自动 mirror 到 top view: `top_x = board_center_x + (board_center_x - bot_x)`
-6. **同面/跨面**: 同面 (top→top) 输出实线; 跨面 (bot→top) 输出虚线 + via 标记
-7. **via 标记**: 跨面目标处标红色空心圆 (过孔), wpts 中 `mark_type: "via"`
+4. **平行线间距**: proximity 检测与已布线路径平行且间距 < 40px 的重叠, 避免水平/垂直线视觉重叠
+5. **标签避让**: 按 `lpos` 定义 keep-out 矩形, 路径不穿过标号文字区域
+6. **bot 镜像**: config 坐标已统一为 top-view 空间 (bot 组件创建时镜像), 算法不再变换; `view` 字段仅用于虚线/via 判定
+7. **同面/跨面**: 两端 view 相同 (top→top / bot→bot) 输出实线; view 不同 (top↔bot) 输出虚线
+8. **via 标记**: 跨面连接的到达端标红色空心圆 (过孔), wpts 中 `mark_type: "via"`
+9. **IC 轮廓**: flow 设计 IC (`outline: true`) 标轮廓矩形; 同面红色实线, 另一面紫色虚线
 
 **render_rx_flow.py** (固化渲染规则):
 - 实线/虚线: 虚线用 semi-transparent 绘制, 避免遮挡 PCB 底图
