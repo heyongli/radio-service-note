@@ -185,7 +185,42 @@ def method_contour(img, near, radius=400):
     return best[1] if best else None
 
 
-def method_crop_ocr(crops_index_paths, refdes_list, categories=None, scale=4, local_ocr=False):
+def confirm_body_box(image_path, bbox, refdes, scale=3, allow_noise=1):
+    """沿 bbox 精确裁切源图, 旋转 OCR, 确认该框是否为该 refdes 的 IC 封装.
+
+    用户验证法: 若沿检测方块精确裁切后 OCR "正好只有 IC12 识别出来",
+    则该框即 IC12 的封装。本函数返回命中 (rot, texts) 或 None。
+
+    allow_noise: 允许的额外噪声 token 数 (引脚号/杂字), 默认 1
+    """
+    import cv2
+    from rapidocr_onnxruntime import RapidOCR
+
+    x1, y1, x2, y2 = bbox
+    img = cv2.imread(image_path)
+    if img is None:
+        return None
+    body = img[y1:y2, x1:x2]
+    if body.size == 0:
+        return None
+    body = cv2.resize(body, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+    ocr = RapidOCR()
+    for rot, code in [(0, None), (90, cv2.ROTATE_90_CLOCKWISE),
+                      (180, cv2.ROTATE_180), (270, cv2.ROTATE_90_COUNTERCLOCKWISE)]:
+        im = cv2.rotate(body, code) if code is not None else body
+        tmp = "/tmp/opencode/_confirm.png"
+        cv2.imwrite(tmp, im)
+        res, _ = ocr(tmp)
+        if not res:
+            continue
+        texts = [t[1].strip().upper() for t in res if t[1].strip()]
+        if refdes in texts and len(texts) <= allow_noise + 1:
+            return (rot, texts)
+    return None
+
+
+def method_crop_ocr(crops_index_paths, refdes_list, categories=None, scale=4, local_ocr=False,
+                    confirm_image=None):
     """矩形+圆形裁切 + 旋转 OCR + refdes 匹配 → IC 本体框.
 
     原理: rectangle_locator / circle_locator 已检出全板矩形与圆形并分类。
@@ -194,6 +229,10 @@ def method_crop_ocr(crops_index_paths, refdes_list, categories=None, scale=4, lo
 
     可靠性/性能: 默认只用预计算的 ic_ocr_results.json (DML OCR, 可靠且快);
     本地 rapidocr 兜底仅当 --local-ocr 显式开启 (慢, 全圆扫可能超时).
+
+    confirm_image: 提供源图则对每个命中做"精确裁切验证"——
+    沿 bbox 精确裁切源图再 OCR, 若正好只识别出该 refdes 才算真命中,
+    否则丢弃 (裁切 padding 里的邻近文字会造成假匹配).
 
     crops_index_paths: rectangle/circle 的 crops_index.json 列表 (可混合 top/bot)
     refdes_list: 已知 refdes (如 chain_order / components_index 里的 IC)
@@ -258,14 +297,32 @@ def method_crop_ocr(crops_index_paths, refdes_list, categories=None, scale=4, lo
                         if hit:
                             break
             if hit:
+                refdes = hit[0]
                 bbox = r["bbox"]
+                # 3) 精确裁切验证: 沿 bbox 裁切源图, 确认该框确实是该 IC 封装
+                vim = confirm_image or r.get("tgt_image", "")
+                if vim:
+                    cand = Path(vim)
+                    if not cand.exists():
+                        # 尝试 crops/<dir>/ -> 项目 render/ 目录解析
+                        cand = Path(cip).resolve().parents[2] / "render" / vim
+                    if cand.exists():
+                        conf = confirm_body_box(str(cand), bbox, refdes)
+                        if conf is None:
+                            continue  # 假匹配: 文字在 padding 里, 不在框内
+                        confirmed = conf[1]
+                    else:
+                        confirmed = []
+                else:
+                    confirmed = []
                 cx, cy = (bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2
-                results.append(dict(refdes=hit[0], view=view, bbox=bbox,
+                results.append(dict(refdes=refdes, view=view, bbox=bbox,
                                     center=[round(cx), round(cy)],
                                     wh=r.get("wh", [bbox[2] - bbox[0], bbox[3] - bbox[1]]),
                                     rot=hit[1], score=hit[2],
                                     crop_file=r.get("crop_file"),
-                                    category=cat, src=str(cip)))
+                                    category=cat, src=str(cip),
+                                    confirmed=confirmed))
     return results
 
 
@@ -292,6 +349,8 @@ def main():
     s4.add_argument("--scale", type=int, default=4, help="OCR 放大倍数")
     s4.add_argument("--local-ocr", action="store_true",
                     help="对无预计算结果的裁切跑本地 rapidocr (慢)")
+    s4.add_argument("--confirm-image",
+                    help="源图路径 (如 render/pcb-top-600-1.png); 提供则做精确裁切验证, 过滤假匹配")
     s4.add_argument("--out")
     args = ap.parse_args()
 
@@ -309,7 +368,8 @@ def main():
         refdes = [v.strip() for v in args.refdes.split(",") if v.strip()]
         cats = tuple(v.strip() for v in args.categories.split(",") if v.strip()) or None
         crops = [v.strip() for v in args.crops.split(",") if v.strip()]
-        out = method_crop_ocr(crops, refdes, cats, args.scale, args.local_ocr)
+        out = method_crop_ocr(crops, refdes, cats, args.scale, args.local_ocr,
+                                  args.confirm_image)
         print(json.dumps(out, indent=1, ensure_ascii=False))
         print(f"# 匹配 {len(out)} 个 IC 本体")
         if args.out:
