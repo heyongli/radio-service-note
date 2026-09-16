@@ -1,4 +1,4 @@
-# projects/ 不进 git(中间产物, OCR 归档, 渲染图等)
+# projects/ 不进 git
 projects/
 
 # Python
