@@ -44,8 +44,9 @@ python3 tools/ic_ocr_scan/ic_ocr_scan.py \
 
 ### 2.2 Windows DirectML GPU (快, 推荐)
 ```bash
-# 方式 1: bat 脚本
-run_ic_ocr_dml.bat
+# 方式 1: bat 脚本 (本目录下)
+tools/ic_ocr_scan/run_ic_ocr_dml.bat          # 全类别 OCR
+tools/ic_ocr_scan/run_ic_ocr_dml_test.bat     # 验证 GPU 是否真正加速
 
 # 方式 2: 直接调用
 C:\Users\radio\py311\python.exe tools\ic_ocr_scan\ic_ocr_scan_dml.py ^
