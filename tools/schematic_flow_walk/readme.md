@@ -84,7 +84,28 @@
 5. 每个断口: 排除空心箭头 → 按 gap 自适应 6-8x 裁切 → 识别符号 + OCR refdes
 6. 输出 chain_order (断口顺序 = 流经元器件链序)
 
-## 探索出有效方法 (2026-09-16, 对照 ground truth 校准)
+## 探索经验总结 (2026-09-16, round 010, 30/31 召回)
+
+### 有效方法 (已固化)
+1. **三极管用 HoughCircles 检测**: 轮廓圆度法被走线破坏 (圆与连线合并 → 圆度<0.8),
+   HoughCircles (r 10-35 @600dpi) + 绿线邻近过滤 效果好
+2. **关联距离要够大 (220px)**: 原理图标号文字离符号可达 200px+, 默认 120 漏检
+3. **反向 OCR 验证 symbol center**: 关联后反向 OCR 符号中心确认, 旋转 0/90/180/270
+   + 1↔I 修正 (FI3↔F13) + FL-363 陶瓷滤波例外; 失败则在文字附近找正确符号
+4. **同 refdes 去重**: 一个标号映射多个符号时保留验证 OK 的
+5. **绿线流过判定**: 符号两侧沿流向共线有绿 (E+W 或 N+S); band=22, side=20,50 最优
+
+### 里程碑
+- round006: 24/31, symbol center 58%
+- round008: 23/31, symbol center 92% (去重+旋转 OCR)
+- round010: **30/31**, symbol center 92% (HoughCircles + assoc 220)
+- 仅剩 C216: 原理图 OCR 未读到标号 (在 C224 正下方, 接 IC4 pin5)
+
+### 待改进
+- precision: flow_through 360 误检多 (旁路/电源件) → 需主路甄别
+- C216: 需从 C224 下方/IC4 pin5 上下文定位
+
+---
 
 ground truth: `projects/<机型>/nettable/gt_rx_flow.json` (用户提供绿线流经元器件)
 
