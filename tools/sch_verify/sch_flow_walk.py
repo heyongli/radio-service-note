@@ -98,29 +98,121 @@ def _ocr_reads_ref(gray, ocr, x, y, refdes, radius=50, rots=(0,)):
     return False, None
 
 
+def _in_box(px, py, box):
+    if not box:
+        return False
+    xs = [p[0] for p in box]; ys = [p[1] for p in box]
+    return min(xs) <= px <= max(xs) and min(ys) <= py <= max(ys)
+
+
+def _locate_text_box(gray, ocr, x, y, refdes, radius=45):
+    """定位 refdes 文字方框 (局部 OCR)."""
+    sub = gray[max(0, y - radius):y + radius, max(0, x - radius):x + radius]
+    if sub.size == 0:
+        return None
+    sub2 = cv2.resize(sub, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+    res, _ = ocr(sub2)
+    if not res:
+        return None
+    tgt = refdes.replace("I", "1").replace("L", "1")
+    for t in res:
+        nr = t[1].strip().upper().replace(" ", "").replace("I", "1").replace("L", "1")
+        if nr and (tgt == nr or tgt in nr or nr in tgt):
+            bx = t[0]
+            return [[round(p[0] / 2.0 + x - radius), round(p[1] / 2.0 + y - radius)] for p in bx]
+    return None
+
+
+def symbol_boundary(gray, x, y, sym_type, radius=80):
+    """检测 (x,y) 附近元器件的符号边界 (圆/方块), 返回 (kind, cx, cy, r|w,h) 或 None.
+
+    circle: 符号是圆 (三极管), 红点须落在圆内
+    rect:   符号是方块 (IC), 红点须落在方块内
+    对电阻/电容 (双线/折线), 边界不封闭, 返回 None (靠 label 框判定)
+    """
+    sub = gray[max(0, y - radius):y + radius, max(0, x - radius):x + radius]
+    if sub.size == 0:
+        return None
+    # 圆: HoughCircles, 取包含 (x,y) 的最小圆
+    if sym_type == "circle":
+        cs = cv2.HoughCircles(sub, cv2.HOUGH_GRADIENT, dp=1.2, minDist=15,
+                              param1=80, param2=30, minRadius=8, maxRadius=radius)
+        if cs is not None:
+            bx, by = radius, radius  # (x,y) 在 sub 内
+            best = None
+            for cx, cy, r in np.rint(cs[0]).astype(int):
+                if (cx - bx) ** 2 + (cy - by) ** 2 <= r * r:
+                    d = abs(cx - bx) + abs(cy - by)
+                    if best is None or d < best[0]:
+                        best = (d, cx + x - radius, cy + y - radius, r)
+            if best:
+                return ("circle", best[1], best[2], best[3])
+        return None
+    # 方块: 阈值+轮廓, 取包含 (x,y) 的矩形
+    _, th = cv2.threshold(sub, 160, 255, cv2.THRESH_BINARY_INV)
+    th = cv2.morphologyEx(th, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+    cnts, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    bx, by = radius, radius
+    best = None
+    for c in cnts:
+        a = cv2.contourArea(c)
+        if a < 4000:
+            continue
+        xx, yy, w, h = cv2.boundingRect(c)
+        if xx <= bx <= xx + w and yy <= by <= yy + h:
+            d = abs(xx + w / 2 - bx) + abs(yy + h / 2 - by)
+            if best is None or d < best[0]:
+                best = (d, xx + x - radius, yy + y - radius, w, h)
+    if best:
+        return ("rect", best[1], best[2], best[3], best[4])
+    return None
+
+
+def _in_boundary(px, py, bd):
+    if bd is None:
+        return None  # 无法判定 (电阻/电容)
+    kind = bd[0]
+    if kind == "circle":
+        cx, cy, r = bd[1], bd[2], bd[3]
+        return (px - cx) ** 2 + (py - cy) ** 2 <= (r + 4) ** 2
+    if kind == "rect":
+        cx, cy, w, h = bd[1], bd[2], bd[3], bd[4]
+        return cx - 4 <= px <= cx + w + 4 and cy - 4 <= py <= cy + h + 4
+    return None
+
+
 def reverse_ocr_verify(gray, ocr, components, sym_list=None, radius=50, correct=True, rots=(0,)):
     """反向 OCR 验证符号中心 (只验 flow_through), 报告准确率.
 
-    correct=True 时纠正: 符号中心读不出 refdes 的, 在文字附近找
-    真正读出该 refdes 的符号 → 更新 symbol_pos.
+    主验证 = 定位 label 文字框: symbol_pos 落在框内 = on_label (红点在文字上);
+    在框外 = OK. 1 次 OCR/组件. 符号边界验证见 sch_symbol_verify (独立程序).
     """
-    n_ok = n_total = n_corrected = 0
+    n_ok = n_total = n_corrected = n_onlabel = 0
     for c in components:
         if c.get("membership") != "flow_through" or not c.get("refdes"):
             continue
         sx, sy = c["symbol_pos"]
-        ok, rot = _ocr_reads_ref(gray, ocr, sx, sy, c["refdes"], radius, rots)
+        tx, ty = c.get("text_pos") or (sx, sy)
+        tbox = c.get("text_box") or _locate_text_box(gray, ocr, tx, ty, c["refdes"])
+        c["text_box"] = tbox
         n_total += 1
-        c["sym_verify"] = "ok" if ok else "wrong"
+        if tbox and _in_box(sx, sy, tbox):
+            c["sym_verify"] = "on_label"
+            n_onlabel += 1
+            ok = False
+        else:
+            c["sym_verify"] = "ok" if tbox else "wrong"
+            ok = bool(tbox)
         if ok:
             n_ok += 1
             continue
-        # 纠正: 文字附近找真正读出 refdes 的符号 (最近 8 个, 命中即停)
+        # 纠正: 文字附近找不在框内且反向 OCR 读出 refdes 的符号
         if not correct or not sym_list:
             continue
-        tx, ty = c.get("text_pos") or (sx, sy)
-        near = sorted(sym_list, key=lambda s: abs(s["x"] - tx) + abs(s["y"] - ty))[:8]
+        near = sorted(sym_list, key=lambda s: abs(s["x"] - tx) + abs(s["y"] - ty))[:10]
         for s in near:
+            if tbox and _in_box(s["x"], s["y"], tbox):
+                continue
             ok2, _ = _ocr_reads_ref(gray, ocr, s["x"], s["y"], c["refdes"], radius, rots)
             if ok2:
                 c["symbol_pos"] = [s["x"], s["y"]]
@@ -128,25 +220,8 @@ def reverse_ocr_verify(gray, ocr, components, sym_list=None, radius=50, correct=
                 c["sym_d"] = abs(s["x"] - tx) + abs(s["y"] - ty)
                 n_corrected += 1
                 break
-    # 去重: 同 refdes 保留 sym_verify=ok/corrected 的第一个
-    seen = {}
-    for c in components:
-        rd = c.get("refdes")
-        if not rd or c.get("membership") != "flow_through":
-            continue
-        keep = c["sym_verify"] in ("ok", "corrected")
-        if rd in seen:
-            if keep and not seen[rd]:
-                seen[rd] = True
-                continue
-            if not keep and seen[rd]:
-                c["membership"] = "dup_drop"
-            else:
-                c["membership"] = "dup_drop"
-        else:
-            seen[rd] = keep
     print(f"[sch_flow_walk] symbol-center reverse-OCR: {n_ok}/{n_total} OK "
-          f"(corrected {n_corrected})")
+          f"(corrected {n_corrected}, on_label {n_onlabel})")
 
 
 def main():

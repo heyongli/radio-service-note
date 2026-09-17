@@ -41,6 +41,8 @@ def main():
     ap.add_argument("--color", default="green", choices=["green", "red", "cyan", "yellow"])
     ap.add_argument("--db", required=True, help="sch_components.json")
     ap.add_argument("--out", required=True, help="输出 PNG")
+    ap.add_argument("--show-aux", action="store_true",
+                    help="渲染非 flow_through 组件 (灰点辅助标记)")
     args = ap.parse_args()
 
     img = cv2.imread(args.img)
@@ -52,17 +54,48 @@ def main():
     overlay = img.copy()
     overlay[mask > 0] = [0, 255, 0]
     color_map = {"flow_through": (0, 255, 255), "branch": (255, 0, 0), "none": (128, 128, 128)}
+    # 只渲染 flow_through (主路) + branch, 按符号位置去重 (一个符号一个红点)
+    # 非 flow_through 由 --show-aux 控制 (灰点辅助)
+    seen_pos = set()
+    shown = []
+    aux = []
     for c in db["components"]:
+        m = c.get("membership", "none")
+        sp = tuple(c["symbol_pos"])
+        if sp in seen_pos:
+            continue
+        seen_pos.add(sp)
+        if m == "flow_through":
+            shown.append(c)
+        elif args.show_aux:
+            aux.append(c)
+    for c in shown:
         sx, sy = c["symbol_pos"]
         tp = c.get("text_pos")
-        m = c.get("membership", "none")
-        color = color_map.get(m, (128, 128, 128))
+        color = (0, 255, 255)
         if tp:
             cv2.line(overlay, tuple(tp), (sx, sy), (0, 0, 255), 1)
             cv2.circle(overlay, tuple(tp), 12, color, 2)
             cv2.putText(overlay, str(c.get("refdes", "")), (tp[0] - 20, tp[1] - 25),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+        # 符号边界 (sch_symbol_verify 检测): 圆/方块
+        bd = c.get("sym_boundary")
+        if bd:
+            if bd.get("kind") == "circle":
+                cv2.circle(overlay, (bd["cx"], bd["cy"]), bd["r"], (0, 255, 255), 2)
+            elif bd.get("kind") == "rect":
+                cv2.rectangle(overlay, (bd["cx"], bd["cy"]),
+                              (bd["cx"] + bd["w"], bd["cy"] + bd["h"]), (0, 255, 255), 2)
+        # label 文字框
+        tbox = c.get("text_box")
+        if tbox and len(tbox) == 4:
+            xs = [p[0] for p in tbox]; ys = [p[1] for p in tbox]
+            cv2.rectangle(overlay, (min(xs), min(ys)), (max(xs), max(ys)), (0, 165, 255), 2)
         cv2.circle(overlay, (sx, sy), 6, (0, 0, 255), -1)
+    # 辅助灰点 (非 flow_through)
+    for c in aux:
+        sx, sy = c["symbol_pos"]
+        cv2.circle(overlay, (sx, sy), 5, (128, 128, 128), -1)
 
     # 图例: 按图比例缩放, 放在空白区 (低墨量象限)
     H, W = img.shape[:2]

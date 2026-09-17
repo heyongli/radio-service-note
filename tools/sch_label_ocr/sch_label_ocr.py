@@ -42,6 +42,26 @@ def reverse_ocr_check(gray, ocr, sx, sy, refdes, radius=50, correction=True):
     return "wrong"
 
 
+def locate_text_box(gray, ocr, x, y, refdes, radius=70):
+    """定位 refdes 文字的方框 (4 角). 用局部 OCR 找 refdes 的 box."""
+    sub = gray[max(0, y - radius):y + radius, max(0, x - radius):x + radius]
+    if sub.size == 0:
+        return None
+    sub2 = cv2.resize(sub, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_CUBIC)
+    res, _ = ocr(sub2)
+    if not res:
+        return None
+    tgt = refdes.replace("I", "1").replace("L", "1")
+    for t in res:
+        nr = t[1].strip().upper().replace(" ", "").replace("I", "1").replace("L", "1")
+        if nr and (tgt == nr or tgt in nr or nr in tgt):
+            bx = t[0]
+            # 缩放回原图坐标
+            box = [[round(p[0] / 2.5 + x - radius), round(p[1] / 2.5 + y - radius)] for p in bx]
+            return box
+    return None
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--img", required=True)
@@ -62,14 +82,19 @@ def main():
 
     # 用全量 refdes 位置集 (优先) 做关联
     refs = {}
+    boxes = {}
     if args.refdes:
         data = json.load(open(args.refdes))
         if isinstance(data, dict):
             for k, v in data.items():
                 refs.setdefault(k, (round(v[0]), round(v[1])))
+                if len(v) >= 5:
+                    boxes[k] = v[4]
         else:
             for r in data:
                 refs.setdefault(r["refdes"], (r["x"], r["y"]))
+                if "box" in r:
+                    boxes[r["refdes"]] = r["box"]
     PREFIX = {"Q": "circle", "TR": "circle", "C": "cap", "IC": "ic",
               "U": "ic", "FI": "ic", "F": "ic", "L": "circle", "R": "cap"}
 
@@ -89,7 +114,8 @@ def main():
         if best is not None:
             _, d0, rd = best
             components.append({"refdes": rd, "symbol_pos": [sx, sy],
-                               "symbol_type": s["sym"], "text_symbol_dist": d0})
+                               "symbol_type": s["sym"], "text_symbol_dist": d0,
+                               "text_box": boxes.get(rd)})
             continue
         # 局部 OCR 兜底
         sub = gray[max(0, sy - 50):sy + 50, max(0, sx - 50):sx + 50]

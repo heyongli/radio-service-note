@@ -99,11 +99,23 @@
 - round006: 24/31, symbol center 58%
 - round008: 23/31, symbol center 92% (去重+旋转 OCR)
 - round010: **30/31**, symbol center 92% (HoughCircles + assoc 220)
+- round013: **30/31 + symbol 边界 100%** (337/337)
 - 仅剩 C216: 原理图 OCR 未读到标号 (在 C224 正下方, 接 IC4 pin5)
 
+### 关键突破 (round013)
+1. **refdes 前缀定符号类型**: Q/TR→圆, IC/FI/X→方块, C→电容, R/L→线.
+   (Hough 圆噪声导致 R 误判 circle, 改用前缀可靠)
+2. **HoughCircles 检测三极管圆**: 薄圆+走线轮廓圆度被破坏, Hough 可靠
+3. **IC 空心方块轮廓**: 放宽填充率 (IC 是黑边空心框)
+4. **label 文字框定位**: OCR 预计算 text_box, symbol 不得落在框内 (on_label 检查)
+5. **label 附近纠正符号位置**: 反向 OCR + 黑边边界反向锚定真实符号
+6. **符号边界验证 (sch_symbol_verify 独立程序)**: 消费前管线结果做筛选,
+   圆/方块须包含红点, 电容须线对, 电阻/电感须连续线
+
 ### 待改进
-- precision: flow_through 360 误检多 (旁路/电源件) → 需主路甄别
+- precision: flow_through 95 误检多 (旁路/电源件) → 需主路甄别
 - C216: 需从 C224 下方/IC4 pin5 上下文定位
+- 程序红点验证有缺陷 (含宽容忍), 需人工抽查
 
 ---
 
