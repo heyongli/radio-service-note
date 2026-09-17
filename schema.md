@@ -409,26 +409,47 @@ schematic_flow_walk ──► chain_order_rx.json ──► radio_design_flow (r
 - `sch_px` 必须含 `sch_image` + `sch_image_dpi`
 - `pcb_px` 必须含 `pcb_view`, 由 `components_index` 溯源
 
-### 3.4 原理图 refdes 位置 JSON (schematic_flow_walk 输入)
+### 3.5 原理图元器件数据库 sch_components.json (像 PCB 侧 components_index 管理)
 
-`schematic_flow_walk --refdes` 的输入: 原理图上已定位的 refdes 列表
-(OCR 网格 tile 识别, 600dpi 空间)。用于断口附近 OCR 关联最相关元器件。
+**定位**: 原理图侧识别+鉴别的中间数据库, 与 PCB 侧 `components_index.json` 对应。
+由 `schematic_flow_walk` 三层管线 (识别→鉴别→渲染) 生成, 是 sch 侧唯一权威库。
 
 ```json
-[
-  {"refdes": "Q27", "x": 1532, "y": 858,
-   "role": "RF-AMP", "category": "transistor"}
-]
+{
+  "_meta": {
+    "purpose": "<机型> 原理图元器件 (识别+绿线鉴别)",
+    "format": "json {components[]}",
+    "version": "<semver>",
+    "view": "sch_600dpi",
+    "source": "schematic_flow_walk (OCR+符号检测+绿线鉴别)"
+  },
+  "components": [
+    {
+      "refdes": "C77",
+      "text_pos": [1309, 1638],        // 标号文字位置 (600dpi)
+      "symbol_pos": [1316, 1674],      // 原理图符号位置 (600dpi)
+      "symbol_type": "cap|circle|ic",  // 符号形状
+      "text_symbol_dist": 42,          // 标号→符号距离
+      "green_touch": true,             // 符号是否触点绿线
+      "green_sides": ["E", "W"],       // 符号侧边绿线方向
+      "membership": "flow_through|branch|none",  // 绿线鉴别结果
+      "flow_dir": "H|V"
+    }
+  ]
+}
 ```
 
-| 字段 | 类型 | 必填 | 含义 |
-|---|---|---|---|
-| `refdes` | str | ✓ | 位号 (IC/Q/C/R/L/F...) |
-| `x` / `y` | int | ✓ | 原理图文字位置 (600dpi) |
-| `role` | str | | 功能 (可选) |
-| `category` | str | | 类型 (可选, 辅助类型匹配) |
+**三层管线 (识别→鉴别→渲染, 分开管理)**:
+- **层1 识别** `recognize_components()`: OCR 全量 refdes + 符号检测 → 标号→符号关联
+- **层2 鉴别** `verify_green_membership()`: 判定每个组件是否属于绿线
+  (`flow_through` 主路 / `branch` 支路 / `none` 非流经)
+- **层3 渲染** `render_sch_flow()`: 独立渲染识别+鉴别结果到 sch
 
-坐标空间与 `--img` 一致 (600dpi 原理图)。
+**字段规则**:
+- `symbol_pos` 是符号位置, ≠ `text_pos` (标号在符号上方)
+- `membership` 三态: flow_through (绿线两侧共线通过=主路) / branch (单侧=支路) /
+  none (不触点绿线)
+- 鉴别依据 (ICOM/Yaesu 域特征, best_practices §5b-3)
 
 ---
 

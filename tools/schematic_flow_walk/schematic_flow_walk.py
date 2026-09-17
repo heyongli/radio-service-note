@@ -520,6 +520,242 @@ def gap_has_symbol(gray, xin, yin, xout, yout, lw=7, min_thick=None):
     return max_thick >= min_thick
 
 
+def recognize_components(gray, refdes_json=None, ocr=None):
+    """层1 识别: OCR 全量 refdes + 符号检测 → 组件集.
+
+    独立于绿线 (任何原理图可用). 输出标号→符号关联:
+    {refdes, text_pos, symbol_pos, symbol_type}
+    """
+    from rapidocr_onnxruntime import RapidOCR
+    if ocr is None:
+        ocr = RapidOCR()
+    H, W = gray.shape
+    # OCR 全量 refdes
+    refs = {}
+    if refdes_json:
+        data = json.load(open(refdes_json))
+        if isinstance(data, dict):
+            for k, v in data.items():
+                refs.setdefault(k, (round(v[0]), round(v[1])))
+        else:
+            for r in data:
+                refs.setdefault(r["refdes"], (r["x"], r["y"]))
+    else:
+        tile, overlap = 900, 150
+        for y0 in range(0, H, tile - overlap):
+            for x0 in range(0, W, tile - overlap):
+                sub = gray[y0:min(y0 + tile, H), x0:min(x0 + tile, W)]
+                res, _ = ocr(sub)
+                if not res:
+                    continue
+                for t in res:
+                    txt = t[1].strip()
+                    if re.match(r"^(IC|Q|F|FI|D|J|C|R|L|X|U|TR|Z)\s*\d+", txt, re.I):
+                        bx = t[0]
+                        cx = (bx[0][0] + bx[2][0]) / 2 + x0
+                        cy = (bx[0][1] + bx[2][1]) / 2 + y0
+                        refs.setdefault(txt.upper().replace(" ", ""), (round(cx), round(cy)))
+    # 符号检测 (独立于绿线): 全局电容 + 圆 + IC
+    syms = [dict(c, sym="cap") for c in detect_caps(gray)]
+    _, th = cv2.threshold(gray, 170, 255, cv2.THRESH_BINARY_INV)
+    th = cv2.morphologyEx(th, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+    cnts, _ = cv2.findContours(th, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    for c in cnts:
+        a = cv2.contourArea(c)
+        if a < 600 or a > 60000:
+            continue
+        per = cv2.arcLength(c, True)
+        if per <= 0 or 4 * np.pi * a / (per * per) < 0.8:
+            continue
+        x, y, w, h = cv2.boundingRect(c)
+        if min(w, h) / max(1, max(w, h)) < 0.6:
+            continue
+        syms.append({"x": x + w // 2, "y": y + h // 2, "sym": "circle"})
+    _, th2 = cv2.threshold(gray, 160, 255, cv2.THRESH_BINARY_INV)
+    th2 = cv2.morphologyEx(th2, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+    cnts2, _ = cv2.findContours(th2, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    for c in cnts2:
+        a = cv2.contourArea(c)
+        if a < 4000 or a > 250000:
+            continue
+        x, y, w, h = cv2.boundingRect(c)
+        if not (60 <= max(w, h) <= 500):
+            continue
+        per = cv2.arcLength(c, True)
+        if per and len(cv2.approxPolyDP(c, 0.04 * per, True)) == 4 and a / (w * h) > 0.55:
+            syms.append({"x": x + w // 2, "y": y + h // 2, "sym": "ic"})
+    # 关联: refdes → 最近符号
+    PREFIX = {"Q": "circle", "TR": "circle", "C": "cap", "IC": "ic",
+              "U": "ic", "FI": "ic", "F": "ic", "L": "circle", "R": "cap"}
+    out = []
+    for rd, (rx, ry) in refs.items():
+        prefix = "".join(ch for ch in rd if ch.isalpha()).upper()
+        best = None
+        for s in syms:
+            d = abs(s["x"] - rx) + abs(s["y"] - ry)
+            if d > 150:
+                continue
+            score = d
+            if PREFIX.get(prefix) == s["sym"]:
+                score -= 60
+            if best is None or score < best[0]:
+                best = (score, d, s)
+        if best is None:
+            cand = detect_symbol_near(gray, rx, ry, PREFIX.get(prefix, "cap"), 100)
+            if cand is None:
+                for alt in ["ic", "circle", "cap"]:
+                    cand = detect_symbol_near(gray, rx, ry, alt, 100)
+                    if cand:
+                        break
+            if cand is None:
+                continue
+            sx, sy = cand["x"], cand["y"]
+            out.append({"refdes": rd, "text_pos": [rx, ry],
+                        "symbol_pos": [sx, sy], "symbol_type": cand["sym"],
+                        "text_symbol_dist": abs(sx - rx) + abs(sy - ry)})
+            continue
+        score, d0, s = best
+        out.append({"refdes": rd, "text_pos": [rx, ry],
+                    "symbol_pos": [s["x"], s["y"]], "symbol_type": s["sym"],
+                    "text_symbol_dist": d0})
+    return out
+
+
+def detect_caps(gray, cap_gap=(8, 40), plate_len=(15, 90)):
+    """检测所有电容符号 (-| |-), 独立于绿线."""
+    H, W = gray.shape
+    edges = cv2.Canny(gray, 60, 160)
+    lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 30, minLineLength=int(plate_len[0]), maxLineGap=3)
+    horiz, vert = [], []
+    if lines is not None:
+        for l in np.asarray(lines).reshape(-1, 4):
+            a1, b1, a2, b2 = l
+            L = abs(a2 - a1) if abs(a2 - a1) >= abs(b2 - b1) else abs(b2 - b1)
+            if L < plate_len[0] or L > plate_len[1]:
+                continue
+            if abs(a2 - a1) >= abs(b2 - b1):
+                horiz.append((a1, b1, a2, b2, L))
+            else:
+                vert.append((a1, b1, a2, b2, L))
+    caps = []
+    for grp, axis in [(horiz, "h"), (vert, "v")]:
+        for i in range(len(grp)):
+            for j in range(i + 1, len(grp)):
+                a, b = grp[i], grp[j]
+                if abs(a[4] - b[4]) > max(6, a[4] * 0.5):
+                    continue
+                if axis == "h":
+                    gap = abs(a[1] - b[1])
+                    xg0, xg1 = max(a[0], b[0]), min(a[2], b[2])
+                    yg = int((a[1] + b[1]) / 2)
+                    if xg1 <= xg0:
+                        continue
+                    gap_sub = gray[yg - 2:yg + 3, xg0:xg1]
+                    wl = min(max(0, xg0 - 10), W - 1)
+                    wr = min(xg1 + 10, W - 1)
+                    left = (gray[max(0, a[1] - 8):a[1] + 9, wl:min(xg0, W)] < 150).sum() > 3 or \
+                           (gray[max(0, b[1] - 8):b[1] + 9, wl:min(xg0, W)] < 150).sum() > 3
+                    right = (gray[max(0, a[1] - 8):a[1] + 9, xg1:wr] < 150).sum() > 3 or \
+                            (gray[max(0, b[1] - 8):b[1] + 9, xg1:wr] < 150).sum() > 3
+                    cx = (a[0] + a[2] + b[0] + b[2]) / 4
+                    cy = (a[1] + b[1]) / 2
+                else:
+                    gap = abs(a[0] - b[0])
+                    yg0, yg1 = max(a[1], b[1]), min(a[3], b[3])
+                    xg = int((a[0] + b[0]) / 2)
+                    if yg1 <= yg0:
+                        continue
+                    gap_sub = gray[yg0:yg1, xg - 2:xg + 3]
+                    wt = max(0, yg0 - 10)
+                    wb = min(yg1 + 10, H - 1)
+                    left = (gray[wt:min(yg0, H), max(0, a[0] - 8):a[0] + 9] < 150).sum() > 3 or \
+                           (gray[wt:min(yg0, H), max(0, b[0] - 8):b[0] + 9] < 150).sum() > 3
+                    right = (gray[yg1:wb, max(0, a[0] - 8):a[0] + 9] < 150).sum() > 3 or \
+                            (gray[yg1:wb, max(0, b[0] - 8):b[0] + 9] < 150).sum() > 3
+                    cx = (a[0] + b[0]) / 2
+                    cy = (a[1] + a[3] + b[1] + b[3]) / 4
+                if not (cap_gap[0] <= gap <= cap_gap[1]):
+                    continue
+                if (gap_sub < 140).sum() > gap_sub.size * 0.15:
+                    continue
+                if not (left and right):
+                    continue
+                caps.append({"x": round(cx), "y": round(cy), "w": a[4], "h": gap + 6})
+    uniq = []
+    for c in caps:
+        if not any(abs(u["x"] - c["x"]) < 15 and abs(u["y"] - c["y"]) < 15 for u in uniq):
+            uniq.append(c)
+    return uniq
+
+
+def verify_green_membership(components, green, band=14):
+    """层2 鉴别: 是否属于绿线 flow → 给每个组件加 membership.
+
+    判定:
+      - none: 符号不触点绿线 (不是流经)
+      - branch: 触点绿线但只有单侧 (支路/死端)
+      - flow_through: 绿线两侧共线通过 (主路, 绿线真正流过)
+
+    返回 components 每个加: {green_touch, green_sides, flow_dir, membership}
+    """
+    H, W = green.shape
+    out = []
+    for c in components:
+        sx, sy = c["symbol_pos"]
+        touch = green[max(0, sy - 25):sy + 25, max(0, sx - 25):sx + 25].sum() > 0
+        if not touch:
+            c["membership"] = "none"
+            c["green_sides"] = []
+            out.append(c)
+            continue
+        sides = []
+        if green[max(0, sy - band):sy + band, min(sx + 70, W - 1):min(sx + 30, W - 1)].sum() > 0 or \
+           green[max(0, sy - band):sy + band, min(sx + 30, W - 1):min(sx + 40, W - 1)].sum() > 0:
+            pass
+        # 侧边绿 (沿流向 ±30~70px)
+        e = green[max(0, sy - band):sy + band, min(sx + 30, W - 1):min(sx + 70, W - 1)].sum() > 0
+        w = green[max(0, sy - band):sy + band, max(0, sx - 70):max(0, sx - 30)].sum() > 0
+        n = green[max(0, sy - 70):max(0, sy - 30), max(0, sx - band):sx + band].sum() > 0
+        s = green[min(sy + 30, H - 1):min(sy + 70, H - 1), max(0, sx - band):sx + band].sum() > 0
+        if e: sides.append("E")
+        if w: sides.append("W")
+        if n: sides.append("N")
+        if s: sides.append("S")
+        if (e and w) or (n and s):
+            c["membership"] = "flow_through"
+            c["flow_dir"] = "H" if (e and w) else "V"
+        elif len(sides) >= 1:
+            c["membership"] = "branch"
+        else:
+            c["membership"] = "none"
+        c["green_sides"] = sides
+        out.append(c)
+    return out
+
+
+def render_sch_flow(img, green, components, out_png, show_membership=True):
+    """层3 渲染: 识别+鉴别结果渲染到 sch (独立渲染层).
+
+    绿线高亮; 组件: flow_through=黄, branch=蓝, none=灰; 标号→符号连线.
+    """
+    H, W = img.shape[:2]
+    overlay = img.copy()
+    overlay[green > 0] = [0, 255, 0]
+    color_map = {"flow_through": (0, 255, 255), "branch": (255, 0, 0), "none": (128, 128, 128)}
+    for c in components:
+        tx, ty = c["text_pos"]
+        sx, sy = c["symbol_pos"]
+        m = c.get("membership", "none")
+        color = color_map.get(m, (128, 128, 128))
+        cv2.line(overlay, (tx, ty), (sx, sy), (0, 0, 255), 1)
+        cv2.circle(overlay, (tx, ty), 12, color, 2)
+        cv2.circle(overlay, (sx, sy), 6, (0, 0, 255), -1)
+        cv2.putText(overlay, c["refdes"], (tx - 20, ty - 25),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+    cv2.imwrite(out_png, overlay)
+    return out_png
+
+
 def detect_flow_components(gray, green, lw=7, ocr=None, refdes_json=None):
     """综合探测绿线流经元器件.
 
@@ -650,11 +886,10 @@ def main():
     ap.add_argument("--dpi", type=int, default=600, help="原理图 dpi (默认 600)")
     ap.add_argument("--color", default="green", choices=["green", "red", "cyan", "yellow"])
     ap.add_argument("--seed", required=True, help="起点位置 x,y (如 ANT)")
-    ap.add_argument("--refdes", help="refdes 位置 JSON (可选, OCR 关联用)")
-    ap.add_argument("--out", required=True, help="输出 chain_order JSON")
-    ap.add_argument("--radius", type=int, default=60)
-    ap.add_argument("--symbols", action="store_true",
-                    help="用断口采样 + OCR 生成流经元器件链序")
+    ap.add_argument("--refdes", help="refdes 位置 JSON (可选, 层1 识别输入)")
+    ap.add_argument("--db", help="输出 sch_components.json (层1+层2 结果数据库)")
+    ap.add_argument("--out", help="输出渲染 PNG (层3)")
+    ap.add_argument("--chain", help="输出 chain_order JSON (flow_through 有序链)")
     args = ap.parse_args()
 
     img = cv2.imread(args.img)
@@ -665,45 +900,57 @@ def main():
     print(f"[walk] {args.color} mask: {(mask > 0).sum()} px ({np.mean(mask)*100:.2f}%)")
     lw = line_width(mask)
     print(f"[walk] line width: {lw} px")
-    sx, sy = (int(v) for v in args.seed.split(","))
 
-    if args.symbols:
-        comps = sample_components(img, gray, mask, (sx, sy))
-        # 按 BFS 距离排序 → 链序
+    # 层1 识别
+    comps = recognize_components(gray, args.refdes)
+    print(f"[l1 recognize] components: {len(comps)}")
+    # 层2 鉴别 (绿线)
+    comps = verify_green_membership(comps, mask)
+    ft = [c for c in comps if c["membership"] == "flow_through"]
+    br = [c for c in comps if c["membership"] == "branch"]
+    print(f"[l2 verify] flow_through={len(ft)} branch={len(br)} none={len(comps)-len(ft)-len(br)}")
+
+    # 数据库输出
+    if args.db:
+        sx, sy = (int(v) for v in args.seed.split(","))
         dist = bfs_dist_from_seed(mask, (sx, sy))
         for c in comps:
-            c["walk_d"] = refdes_distance(dist, c["x"], c["y"], max(args.radius, lw * 4))
-        comps.sort(key=lambda c: (c["walk_d"] is None,
-                                  c["walk_d"] if c["walk_d"] is not None else 10**9))
-        chain = []
-        for i, c in enumerate(comps):
-            chain.append({
-                "idx": i + 1,
-                "name": c["refdes"] or "-",
-                "refdes": c["refdes"],
-                "sch_px": [c["x"], c["y"]],
-                "type": c["type"],
-                "walk_d": c["walk_d"],
-                "status": "confirmed" if c["refdes"] else "unverified",
-            })
-        out = {
-            "version": "1.0",
-            "description": f"schematic flow walk ({args.color}, break sampling)",
-            "source": f"schematic {args.color} mask + flood walk breaks + OCR",
-            "chain": chain,
-        }
-        with open(args.out, "w") as f:
-            json.dump(out, f, indent=2, ensure_ascii=False)
-        print(f"[walk] chain saved: {args.out} ({len(chain)} refs)")
-        for c in chain:
-            d = c["walk_d"] if c["walk_d"] is not None else "-"
-            print(f"  {c['idx']:3d} {c['refdes'] or '-':6s} {c['type']:5s} walk_d={d}")
-        return
+            c["walk_d"] = refdes_distance(dist, c["symbol_pos"][0], c["symbol_pos"][1],
+                                          max(60, lw * 4))
+        db = {"_meta": {"purpose": f"sch components ({args.color} flow)",
+                        "view": f"sch_{args.dpi}dpi",
+                        "source": "schematic_flow_walk (recognize+verify)"},
+              "components": comps}
+        with open(args.db, "w") as f:
+            json.dump(db, f, indent=2, ensure_ascii=False)
+        print(f"[db] saved: {args.db}")
 
-    breaks = flood_walk_breaks(mask, (sx, sy), gray)
-    print(f"[walk] breaks: {len(breaks)}")
-    for b in breaks:
-        print(f"  @({b['x']},{b['y']}) gap={b['gap']}")
+    # 层3 渲染
+    if args.out:
+        render_sch_flow(img, mask, comps, args.out)
+        print(f"[l3 render] saved: {args.out}")
+
+    # chain_order (flow_through 有序)
+    if args.chain:
+        ft_sorted = sorted(ft, key=lambda c: (c.get("walk_d") is None,
+                                       c.get("walk_d") if c.get("walk_d") is not None else 1e9))
+        chain = []
+        for i, c in enumerate(ft_sorted):
+            chain.append({"idx": i + 1, "refdes": c["refdes"],
+                          "sch_px": c["symbol_pos"], "symbol_type": c["symbol_type"],
+                          "walk_d": c.get("walk_d"),
+                          "status": "confirmed" if c["membership"] == "flow_through" else "unverified"})
+        out = {"version": "1.0",
+               "description": f"schematic {args.color} flow chain (layered)",
+               "source": "schematic_flow_walk recognize+verify",
+               "chain": chain}
+        with open(args.chain, "w") as f:
+            json.dump(out, f, indent=2, ensure_ascii=False)
+        print(f"[chain] saved: {args.chain} ({len(chain)} flow_through)")
+
+    # 打印 flow_through
+    for c in ft:
+        print(f"  {c['refdes']:6s} sym={c['symbol_type']:6s} sides={c['green_sides']} d={c.get('walk_d')}")
 
 
 if __name__ == "__main__":

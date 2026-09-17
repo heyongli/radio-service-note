@@ -479,3 +479,27 @@ rot=270: ox = Wc - 1 - ry, oy = rx            (Wc = 原始 crop 宽度)
 
 **输入**: JSON config (components 坐标/view/lpos + connections 列表)
 **输出**: wpts JSON, 与 `svg_render.py` 兼容
+
+### 13.3 原理图侧信号流识别 (sch workflow, 分层如 PCB)
+
+**分层管线** (各程序独立发展, 经 `sch_components.json` 数据库交互, schema §3.5):
+```
+sch_trace(沿绿线走线+符号) → sch_label_ocr(读标号) → sch_flow_walk(绿线流鉴别)
+   → sch_render(渲染)     → chain_order (有序链)
+```
+
+| 工具 | 路径 | 职责 |
+|---|---|---|
+| `sch_trace.py` | `tools/sch_trace/` | 沿绿线 BFS 走线, 局部探测符号 (电容/三极管/IC), 只识别绿线上的 |
+| `sch_label_ocr.py` | `tools/sch_label_ocr/` | 读绿线符号旁的标号 (OCR 关联) |
+| `sch_flow_walk.py` | `tools/sch_verify/` | 绿线流鉴别: membership (flow_through 主路/branch 支路/none) |
+| `sch_render.py` | `tools/sch_render/` | 渲染识别+鉴别结果到原理图 |
+
+**数据库交互** (`sch_components.json`, schema §3.5): 每层读/写同一库,
+识别输出 symbols → label_ocr 填 refdes → flow_walk 填 membership → render 消费。
+
+**鉴别判定 (ICOM/Yaesu 域特征)**: 主路 = 符号两侧沿流向共线有绿 (E+W 或 N+S);
+支路 = 单侧绿; 非流经 = 不触点绿线。
+
+**产物**: `chain_order_rx.json` (flow_through 有序链), 供 make_config_from_chain →
+PCB 标注全自动闭环。
