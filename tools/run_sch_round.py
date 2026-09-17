@@ -70,6 +70,11 @@ def main():
          "--band", str(args.band), "--side-dist", args.side_dist,
          "--verify-rots", args.verify_rots])
 
+    print(f"=== Round {rn}: sch 符号识别+验证 (sch 管线之后) ===")
+    run([sys.executable, "tools/sch_symbol/sch_symbol.py", "--img", IMG, "--db", args.db])
+    run([sys.executable, "tools/sch_symbol_verify/sch_symbol_verify.py",
+         "--img", IMG, "--db", args.db, "--correct"])
+
     print(f"\n=== Round {rn}: sch 渲染 ===")
     run([sys.executable, "tools/sch_render/sch_render.py", "--img", IMG,
          "--color", "green", "--db", args.db,
