@@ -72,6 +72,81 @@ def verify(components, green, band=14, touch_r=25, side=(30, 70)):
     return out
 
 
+def _ocr_reads_ref(gray, ocr, x, y, refdes, radius=50):
+    """在 (x,y) 反向 OCR, 尝试 4 个旋转, 返回是否读出 refdes (含 1↔I 修正)."""
+    def norm(s):
+        return s.replace("I", "1").replace("L", "1")
+    tgt = norm(refdes)
+    sub = gray[max(0, y - radius):y + radius, max(0, x - radius):x + radius]
+    if sub.size == 0:
+        return False, None
+    base = cv2.resize(sub, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_CUBIC)
+    for rot, code in [(0, None), (90, cv2.ROTATE_90_CLOCKWISE),
+                      (180, cv2.ROTATE_180), (270, cv2.ROTATE_90_COUNTERCLOCKWISE)]:
+        im = cv2.rotate(base, code) if code is not None else base
+        res, _ = ocr(im)
+        if not res:
+            continue
+        for t in res:
+            nr = norm(t[1].strip().upper().replace(" ", ""))
+            if nr and (tgt == nr or tgt in nr or nr in tgt):
+                return True, rot
+        if any("FL-363" in t[1] for t in res):
+            return True, rot
+    return False, None
+
+
+def reverse_ocr_verify(gray, ocr, components, sym_list=None, radius=50, correct=True):
+    """反向 OCR 验证符号中心 (只验 flow_through), 报告准确率.
+
+    correct=True 时纠正: 符号中心读不出 refdes 的, 在文字附近找
+    真正读出该 refdes 的符号 → 更新 symbol_pos.
+    """
+    n_ok = n_total = n_corrected = 0
+    for c in components:
+        if c.get("membership") != "flow_through" or not c.get("refdes"):
+            continue
+        sx, sy = c["symbol_pos"]
+        ok, rot = _ocr_reads_ref(gray, ocr, sx, sy, c["refdes"], radius)
+        n_total += 1
+        c["sym_verify"] = "ok" if ok else "wrong"
+        if ok:
+            n_ok += 1
+            continue
+        # 纠正: 文字附近找真正读出 refdes 的符号 (最近 8 个, 命中即停)
+        if not correct or not sym_list:
+            continue
+        tx, ty = c.get("text_pos") or (sx, sy)
+        near = sorted(sym_list, key=lambda s: abs(s["x"] - tx) + abs(s["y"] - ty))[:8]
+        for s in near:
+            ok2, _ = _ocr_reads_ref(gray, ocr, s["x"], s["y"], c["refdes"], radius)
+            if ok2:
+                c["symbol_pos"] = [s["x"], s["y"]]
+                c["sym_verify"] = "corrected"
+                c["sym_d"] = abs(s["x"] - tx) + abs(s["y"] - ty)
+                n_corrected += 1
+                break
+    # 去重: 同 refdes 保留 sym_verify=ok/corrected 的第一个
+    seen = {}
+    for c in components:
+        rd = c.get("refdes")
+        if not rd or c.get("membership") != "flow_through":
+            continue
+        keep = c["sym_verify"] in ("ok", "corrected")
+        if rd in seen:
+            if keep and not seen[rd]:
+                seen[rd] = True
+                continue
+            if not keep and seen[rd]:
+                c["membership"] = "dup_drop"
+            else:
+                c["membership"] = "dup_drop"
+        else:
+            seen[rd] = keep
+    print(f"[sch_flow_walk] symbol-center reverse-OCR: {n_ok}/{n_total} OK "
+          f"(corrected {n_corrected})")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--img", required=True, help="原理图渲染图")
@@ -82,6 +157,7 @@ def main():
     ap.add_argument("--band", type=int, default=22, help="绿线侧边探测带宽 (px; 实测 22 最优)")
     ap.add_argument("--touch-r", type=int, default=25, help="符号触点绿线判定半径")
     ap.add_argument("--side-dist", type=str, default="20,50", help="侧边绿线探测距离范围 (px; 实测 20,50 最优)")
+    ap.add_argument("--no-verify", action="store_true", help="跳过反向 OCR 验证 (加速)")
     args = ap.parse_args()
 
     img = cv2.imread(args.img)
@@ -94,6 +170,10 @@ def main():
     db["components"] = verify(db["components"], mask, args.band, args.touch_r,
                                   tuple(int(v) for v in args.side_dist.split(",")))
     db["_meta"]["verify"] = f"{args.color} flow membership"
+    if not args.no_verify:
+        from rapidocr_onnxruntime import RapidOCR
+        reverse_ocr_verify(cv2.cvtColor(cv2.imread(args.img), cv2.COLOR_BGR2GRAY),
+                           RapidOCR(), db["components"])
     with open(args.db, "w") as f:
         json.dump(db, f, indent=2, ensure_ascii=False)
 

@@ -19,6 +19,29 @@ import sys
 import cv2
 
 
+def norm_ref(s):
+    return s.replace("I", "1").replace("L", "1")
+
+
+def reverse_ocr_check(gray, ocr, sx, sy, refdes, radius=50, correction=True):
+    """反向 OCR 验证: 在符号中心读 refdes, 确认关联正确."""
+    sub = gray[max(0, sy - radius):sy + radius, max(0, sx - radius):sx + radius]
+    sub2 = cv2.resize(sub, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_CUBIC)
+    res, _ = ocr(sub2)
+    if not res:
+        return "empty"
+    reads = [t[1].strip().upper().replace(" ", "") for t in res]
+    target = norm_ref(refdes)
+    for r in reads:
+        nr = norm_ref(r)
+        if nr and (target == nr or target in nr or nr in target):
+            return "ok"
+    # FL-363 陶瓷滤波 (F13/F14 = FI3/FI4)
+    if any("FL-363" in r for r in reads):
+        return "ok"
+    return "wrong"
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--img", required=True)
@@ -84,6 +107,7 @@ def main():
 
     db["components"] = components
     db["_meta"]["source"] = "sch_trace + sch_label_ocr"
+
     with open(args.db, "w") as f:
         json.dump(db, f, indent=2, ensure_ascii=False)
     print(f"[sch_label_ocr] saved: {args.db} ({len(components)} labeled)")
