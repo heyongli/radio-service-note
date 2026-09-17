@@ -76,6 +76,8 @@ def main():
     ap.add_argument("--img", required=True, help="原理图渲染图")
     ap.add_argument("--color", default="green", choices=["green", "red", "cyan", "yellow"])
     ap.add_argument("--db", required=True, help="sch_components.json (读+写 membership)")
+    ap.add_argument("--chain", help="输出 chain_order JSON (flow_through 有序链, 供结合管线)")
+    ap.add_argument("--seed", help="起点 x,y (可选, 用于 walk_d 排序)")
     args = ap.parse_args()
 
     img = cv2.imread(args.img)
@@ -93,6 +95,57 @@ def main():
     ft = [c for c in db["components"] if c["membership"] == "flow_through"]
     br = [c for c in db["components"] if c["membership"] == "branch"]
     print(f"[sch_flow_walk] flow_through={len(ft)} branch={len(br)} none={len(db['components'])-len(ft)-len(br)}")
+
+    # chain_order 输出 (去重 + 排序)
+    if args.chain:
+        import numpy as np
+        # 去重 (同 refdes 保留第一个)
+        seen = set()
+        ftu = []
+        for c in ft:
+            rd = c.get("refdes")
+            if not rd or rd in seen:
+                continue
+            seen.add(rd)
+            ftu.append(c)
+        # 排序: 按绿线走线距离 (BFS from seed)
+        if args.seed:
+            from collections import deque
+            sx, sy = (int(v) for v in args.seed.split(","))
+            mask = color_mask(cv2.imread(args.img), args.color)
+            H, W = mask.shape
+            dist = np.full((H, W), -1, dtype=np.int32)
+            if mask[sy, sx]:
+                q = deque([(sx, sy)])
+                dist[sy, sx] = 0
+                while q:
+                    x, y = q.popleft()
+                    d = dist[y, x]
+                    for dx, dy in [(1,0),(-1,0),(0,1),(0,-1),(1,1),(1,-1),(-1,1),(-1,-1)]:
+                        nx, ny = x+dx, y+dy
+                        if 0 <= nx < W and 0 <= ny < H and mask[ny, nx] and dist[ny, nx] < 0:
+                            dist[ny, nx] = d + 1
+                            q.append((nx, ny))
+            for c in ftu:
+                sx2, sy2 = c["symbol_pos"]
+                sub = dist[max(0, sy2-60):sy2+60, max(0, sx2-60):sx2+60]
+                pos = np.where(sub >= 0)
+                c["walk_d"] = int(sub[pos[0], pos[1]].min()) if len(pos[0]) else None
+            ftu.sort(key=lambda c: (c.get("walk_d") is None,
+                                    c.get("walk_d") if c.get("walk_d") is not None else 1e9))
+        chain = []
+        for i, c in enumerate(ftu):
+            chain.append({"idx": i + 1, "refdes": c["refdes"],
+                          "sch_px": c["symbol_pos"], "symbol_type": c["symbol_type"],
+                          "walk_d": c.get("walk_d"),
+                          "status": "confirmed"})
+        out = {"version": "1.0",
+               "description": f"schematic {args.color} flow chain (sch_flow_walk)",
+               "source": "sch_trace+sch_label_ocr+sch_flow_walk",
+               "chain": chain}
+        with open(args.chain, "w") as f:
+            json.dump(out, f, indent=2, ensure_ascii=False)
+        print(f"[chain] saved: {args.chain} ({len(chain)} flow_through)")
     for c in ft:
         rd = c["refdes"] if c["refdes"] else "-"
         print(f"  {rd:6s} sides={c['green_sides']} {c['flow_dir']}")

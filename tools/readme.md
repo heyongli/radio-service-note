@@ -6,27 +6,38 @@
 **目录约定**: `tools/` 只放当前最佳工具; 参考/旧管线一律在 `tools/zref/`
 (字母序靠后, 不再使用/迭代)。
 
-## 全流程管线 (怎么配合)
+## 全流程管线 (三大管线 + 同步闭环)
 
 ```
-① 原理图 → 学信号流图
-   schematic_flow_walk
-     彩线掩膜: 绿=RX, 红=TX, 黄=控制, 青=common
-     + 符号形状(圆=三极管/双短线=电容/折线=电阻/螺旋=电感) + OCR refdes
-     ──► chain_order_rx.json / chain_order_tx.json / chain_order_ctl.json
-         (流经元器件图, 固定格式, schema §3)
-
-② 流经元器件图 (中间结构, 权威有序列表)
-   sch_px (原理图) + pcb_px (PCB top, bot 已镜像) + role/status
-
-③ waypoint 计算
-   make_config_from_chain ──► rx_flow_config.json (自动)
-   signal_flow_route ──► wpts JSON (最小交叉/避标签/实虚线/via/IC轮廓)
-
-④ 渲染
-   svg_render ──► annot/rx_flow_top.{png,svg}  (PCB 标注)
-   radio_design_flow ──► radio_rx_flow.{svg,png}  (radio-design 流经图)
+┌─ ① sch 管线 (原理图识别信号流) ─────────────────────────────┐
+│   sch_trace(沿绿线走线+符号) → sch_label_ocr(读标号)          │
+│     → sch_flow_walk(绿线流鉴别) → chain_order_rx.json        │
+│        └──────── 经 sch_components.json 数据库 ──────┘       │
+└────────────────────────────────────────────────────────────┘
+                        │  chain_order (流经元器件图, schema §3)
+                        ▼
+┌─ ③ 结合管线 (sch flow → PCB 标注) ──────────────────────────┐
+│   make_config_from_chain (chain + pcb 位置 → 路由 config)     │
+│     → signal_flow_route (waypoint 计算)                      │
+│     → svg_render (渲染) → annot/rx_flow_roundXXX.{png,svg}   │
+└────────────────────────────────────────────────────────────┘
+                        ▲
+┌─ ② pcb 管线 (PCB 定位元器件, 提供 pcb 位置) ─────────────────┐
+│   pcb_rect_locator → pcb_circle_locator → pcb_label_ocr      │
+│     → pcb_components (components_index.json)                 │
+│     → pcb_package (封装) / pcb_verify (校验)                 │
+└────────────────────────────────────────────────────────────┘
 ```
+
+**同步闭环 (关键)**: sch 识别出的 flow 必须同步到 PCB。
+`sch_flow_walk --chain` 产出 chain_order → `make_config_from_chain`
+读 components_index.json 回填 pcb 位置 → 标注 PCB。
+sch 识别结果与 PCB 标注保持一致。
+
+**round 命名**: 每轮探索产出带 `roundXXX` 编号 (sch_flow_roundXXX.png,
+rx_flow_roundXXX.png), 便于对比迭代结果。
+
+**彩线颜色**: 绿=RX, 红=TX, 黄=控制, 青=common。
 
 **数据流向**: 原理图学流经元器件 → 固定格式中间结构 → waypoint 计算 → 渲染。
 每级产物都是 JSON (chain_order / config / wpts), 渲染只是派生视图。
