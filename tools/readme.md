@@ -13,6 +13,7 @@
 │   sch_trace(沿绿线走线+符号) → sch_label_ocr(读标号)          │
 │     → sch_flow_walk(绿线流鉴别) → chain_order_rx.json        │
 │     → sch_symbol(符号本体识别) → sch_symbol_verify(验证)      │
+│     → sch_wire(走线识别: 引出线对齐黑走线+连接点)            │
 │        └──────── 经 sch_components.json 数据库 ──────┘       │
 └────────────────────────────────────────────────────────────┘
                         │  chain_order (流经元器件图, schema §3)

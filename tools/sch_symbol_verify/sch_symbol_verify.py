@@ -51,20 +51,32 @@ def main():
     ap.add_argument("--db", required=True, help="sch_components.json (读写, 加 sym_verify)")
     ap.add_argument("--correct", action="store_true",
                     help="红点不在本体上时, 用本体中心修正 symbol_pos")
+    ap.add_argument("--sizes-db", default=None,
+                    help="符号尺寸知识库路径 (默认 projects/<机型>/nettable/sch_symbol_sizes.json)")
+    ap.add_argument("--size-tol", type=float, default=0.6,
+                    help="尺寸偏差容差 (典型尺寸 ±60%)")
     args = ap.parse_args()
+
+    sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent / "sch_symbol"))
+    from common import body_size, update_sizes_db, typical_size, check_size
+    if args.sizes_db is None:
+        # 默认写入项目 nettable (数据入 project)
+        from pathlib import Path
+        args.sizes_db = str(Path(args.db).parent / "sch_symbol_sizes.json")
 
     img = cv2.imread(args.img)
     if img is None:
         sys.exit(f"cannot read {args.img}")
     db = json.load(open(args.db))
 
-    n = n_ok = n_corrected = n_onlabel = 0
+    n = n_ok = n_corrected = n_onlabel = n_sizedev = 0
     for c in db["components"]:
         if c.get("membership") != "flow_through" or not c.get("refdes"):
             continue
         sx, sy = c["symbol_pos"]
         tbox = c.get("text_box")
         body = c.get("symbol_body")
+        sym = c.get("symbol_type", "cap")
         n += 1
         if in_box(sx, sy, tbox):
             c["sym_verify"] = "on_label"
@@ -74,8 +86,21 @@ def main():
         if inside is True:
             c["sym_verify"] = "ok"
             n_ok += 1
+            # 尺寸知识库: 记录已验证符号尺寸 (IC 按型号键, 不同型号大小不同)
+            if args.sizes_db:
+                sz = body_size(body)
+                if sz:
+                    sym_key = f"ic:{c.get('ic_model')}" if sym == "ic" and c.get("ic_model") else sym
+                    update_sizes_db(args.sizes_db, sym_key, sz, c["refdes"])
+                    typ = typical_size(args.sizes_db, sym_key)
+                    r = check_size(sz, typ, args.size_tol) if typ else None
+                    c["size_check"] = r
+                    if r is True:
+                        c["size_dev"] = None
+                    elif r is not None:
+                        c["size_dev"] = round(r, 2)
+                        n_sizedev += 1
         elif inside is False and args.correct and body:
-            # 用本体中心修正红点
             c["symbol_pos"] = [body.get("cx", sx), body.get("cy", sy)]
             c["sym_verify"] = "corrected"
             n_corrected += 1
@@ -86,7 +111,8 @@ def main():
         json.dump(db, f, indent=2, ensure_ascii=False)
     import os
     os.replace(tmp, args.db)
-    print(f"[sch_symbol_verify] ok={n_ok}/{n} corrected={n_corrected} on_label={n_onlabel}")
+    print(f"[sch_symbol_verify] ok={n_ok}/{n} corrected={n_corrected} "
+          f"on_label={n_onlabel} size_dev={n_sizedev}")
 
 
 if __name__ == "__main__":

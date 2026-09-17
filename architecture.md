@@ -511,6 +511,11 @@ sch_trace(沿绿线走线+符号) → sch_label_ocr(读标号) → sch_flow_walk
 | `sch_label_ocr.py` | `tools/sch_label_ocr/` | 读绿线符号旁的标号 (OCR 关联) |
 | `sch_flow_walk.py` | `tools/sch_verify/` | 绿线流鉴别: membership (flow_through 主路/branch 支路/none) |
 | `sch_render.py` | `tools/sch_render/` | 渲染识别+鉴别结果到原理图 |
+| `sch_wire/` | `tools/sch_wire/` | **走线识别**: 黑走线骨架+连接圆点 (引出线对齐走线) |
+
+**sch_wire (走线识别, 独立发展)**: 纯黑图层 (去绿线) → 走线骨架 (Zhang-Suen 细化)
+→ 端点/交叉点 (度 1/度 3+), 连接圆点 (小黑圆 = 交叉/连接).
+元件引出线应**对齐走线** (黑线); 连接点决定走线交叉. 无监督方法提高准确度.
 
 **数据库交互** (`sch_components.json`, schema §3.5): 每层读/写同一库,
 识别输出 symbols → label_ocr 填 refdes → flow_walk 填 membership → render 消费。
@@ -520,3 +525,46 @@ sch_trace(沿绿线走线+符号) → sch_label_ocr(读标号) → sch_flow_walk
 
 **产物**: `chain_order_rx.json` (flow_through 有序链), 供 make_config_from_chain →
 PCB 标注全自动闭环。
+
+---
+
+## 14. 无监督进化方法 (自我学习+自我校验, 2026-09-17 沉淀)
+
+**核心**: 无需人工标注, 识别→校验→积累知识→反哺识别, 逐步进化变准。
+
+### 14.1 自我校验手段 (识别后自证)
+| 方法 | 原理 | 判定 |
+|---|---|---|
+| **反向 OCR** | 在符号中心 OCR, 验证读出 refdes 与关联一致 | 一致=OK, 否则关联错误 |
+| **label 方框定位** | OCR 预计算文字框, 红点不得落在框内 | on_label = 错误 |
+| **符号边界包含** | 三极管圆/IC 方块须包围红点 (黑边轮廓/Hough) | 不包含 = 错误 |
+| **符号重叠检测** | 电路图符号不能重叠 | 重叠 = 误关联, 触发去重 |
+| **refdes 去重** | 同一 refdes 只能一个符号 (符号不重叠) | 保留验证 OK 的 |
+| **终端定位** | 2 端器件 (C/R/L) 黑线断口=端点, 中心=断口中点 | 位置自证 |
+
+### 14.2 自我学习积累 (知识随确认增长)
+| 知识 | 存储 | 机制 |
+|---|---|---|
+| **符号尺寸库** | `sch_symbol_sizes.json` (schema §3.6) | 确认 OK 的符号尺寸 **append 累积**; 中位=典型 |
+| **IC 型号尺寸** | 按型号键 `ic:<model>` | 不同型号大小不同, 分别记录 |
+| **合成符号掩膜** | 由典型尺寸生成 | 掩膜匹配确认新符号 |
+| **纯黑图层** | 走线检测基础 | 去绿线干扰 |
+
+### 14.3 进化闭环 (无监督)
+```
+识别 (sch_trace/label_ocr/flow_walk/symbol)
+  → 校验 (reverse OCR / 边界 / 重叠 / label)
+  → 确认 OK 的 → 尺寸/掩膜知识入库 (append)
+  → 知识反哺 (典型尺寸校验 / 合成掩膜匹配 / 跨机型复用)
+  → 越用越准
+```
+- 每个确认的符号都是学习样本, 无人工标注
+- 校验失败自动纠正 (符号位置/关联), 纠正后再验证
+- 知识库跨机型/跨图纸可复用同类型符号
+
+### 14.4 关键教训
+- 程序含宽容忍 → 需人工抽查 (round013 红点在符号内但仍有缺陷)
+- 校验手段逐步叠加 (反向OCR → label框 → 边界 → 重叠 → 尺寸 → 掩膜),
+  每层减少一类错误
+- 识别(符号本体)与验证(位置)分层: sch_symbol (对应 pcb_package) /
+  sch_symbol_verify (对应 pcb_verify)

@@ -46,6 +46,8 @@ def main():
     ap.add_argument("--crop", action="store_true",
                     help="裁剪大片空白边 (最后一个步骤)")
     ap.add_argument("--crop-margin", type=int, default=40, help="裁剪后留白 (px)")
+    ap.add_argument("--redraw-caps", action="store_true",
+                    help="用学习到的电容掩膜重新描边渲染 (干净统一)")
     args = ap.parse_args()
 
     img = cv2.imread(args.img)
@@ -138,6 +140,27 @@ def main():
                     (0, 0, 0), 3 * lw_px)
     cv2.imwrite(args.out, overlay)
     print(f"[sch_render] saved: {args.out} (legend at quadrant {best_q[0]},{best_q[1]})")
+
+    # 用学习到的电容掩膜做高亮图层 (不覆盖原电路, 叠加高亮描边)
+    if args.redraw_caps:
+        for c in db["components"]:
+            if c.get("membership") != "flow_through" or not c.get("refdes"):
+                continue
+            if c.get("symbol_type") != "cap" or not c.get("symbol_body"):
+                continue
+            b = c["symbol_body"]
+            cx, cy = b.get("cx", c["symbol_pos"][0]), b.get("cy", c["symbol_pos"][1])
+            gap = b.get("gap", 18)
+            ln = b.get("len", 45)
+            hw = 3
+            col = (0, 0, 200)  # 高亮蓝 (叠加, 原电路可见)
+            x1 = cx - ln // 2
+            x2 = cx + ln // 2
+            cv2.line(overlay, (x1, cy - gap // 2), (x1, cy + gap // 2), col, hw)
+            cv2.line(overlay, (x2, cy - gap // 2), (x2, cy + gap // 2), col, hw)
+            cv2.line(overlay, (x1 - 25, cy), (x1, cy), col, hw)
+            cv2.line(overlay, (x2, cy), (x2 + 25, cy), col, hw)
+        print(f"[sch_render] caps highlighted (overlay, original preserved)")
 
     # 最后一步: 裁剪大片空白边
     if args.crop:

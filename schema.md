@@ -451,6 +451,40 @@ schematic_flow_walk ──► chain_order_rx.json ──► radio_design_flow (r
   none (不触点绿线)
 - 鉴别依据 (ICOM/Yaesu 域特征, best_practices §5b-3)
 
+### 3.6 原理图符号尺寸知识库 sch_symbol_sizes.json (不断丰富的封装知识)
+
+**定位**: 从电路图学习到的**符号封装知识**——随确认符号**不断累积**的尺寸记录,
+用于校验印证新符号 (同类型符号边界应接近典型尺寸).
+
+**数据位置**: `projects/<机型>/nettable/sch_symbol_sizes.json`
+
+```json
+{
+  "cap": [
+    {"size": [45, 22], "refdes": "C124"},
+    {"size": [48, 20], "refdes": "C133"}
+  ],
+  "circle": [
+    {"size": [44, 44], "refdes": "Q27"}
+  ],
+  "ic": [
+    {"size": [120, 90], "refdes": "IC4"}
+  ]
+}
+```
+
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| key | str | 符号类型 (cap/circle/ic/res/ind/diode/varactor) |
+| `size` | [w, h] | 符号本体尺寸 (px, 600dpi) |
+| `refdes` | str | 记录来源 (溯源) |
+
+**不断丰富机制** (sch_symbol_verify 消费):
+- 每个**确认 OK** 的符号, 其本体尺寸**追加**到知识库 (append, 不覆盖)
+- `typical_size()`: 中位宽/高 = 该类型典型尺寸 (随样本增多趋于稳定)
+- `check_size()`: 新符号尺寸偏离典型 ±60% 以上 → 标记 `size_dev` (疑似识别错误)
+- 知识库越用越准; 跨机型/跨图纸可复用同类型符号的典型尺寸
+
 ---
 
 ## 4. wpts_*.json 元数据规范

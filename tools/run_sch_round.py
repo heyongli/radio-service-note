@@ -71,9 +71,18 @@ def main():
          "--verify-rots", args.verify_rots])
 
     print(f"=== Round {rn}: sch 符号识别+验证 (sch 管线之后) ===")
-    run([sys.executable, "tools/sch_symbol/sch_symbol.py", "--img", IMG, "--db", args.db])
+    for tool in ["sch_transistor", "sch_ic", "sch_cap", "sch_res", "sch_ind", "sch_diode", "sch_varactor"]:
+        run([sys.executable, f"tools/sch_symbol/{tool}.py", "--img", IMG, "--db", args.db])
     run([sys.executable, "tools/sch_symbol_verify/sch_symbol_verify.py",
          "--img", IMG, "--db", args.db, "--correct"])
+
+    # 符号尺寸知识库同步到项目 nettable (数据入 project, 不断累积)
+    sizes_src = Path(args.db).parent / "sch_symbol_sizes.json"
+    sizes_dst = ROOT / "projects/icom2200h/nettable/sch_symbol_sizes.json"
+    if sizes_src.exists():
+        import shutil
+        shutil.copy(sizes_src, sizes_dst)
+        print(f"[run_sch_round] sizes DB synced: {sizes_dst}")
 
     print(f"\n=== Round {rn}: sch 渲染 ===")
     run([sys.executable, "tools/sch_render/sch_render.py", "--img", IMG,
