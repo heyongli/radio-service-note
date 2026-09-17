@@ -43,6 +43,9 @@ def main():
     ap.add_argument("--out", required=True, help="输出 PNG")
     ap.add_argument("--show-aux", action="store_true",
                     help="渲染非 flow_through 组件 (灰点辅助标记)")
+    ap.add_argument("--crop", action="store_true",
+                    help="裁剪大片空白边 (最后一个步骤)")
+    ap.add_argument("--crop-margin", type=int, default=40, help="裁剪后留白 (px)")
     args = ap.parse_args()
 
     img = cv2.imread(args.img)
@@ -135,6 +138,20 @@ def main():
                     (0, 0, 0), 3 * lw_px)
     cv2.imwrite(args.out, overlay)
     print(f"[sch_render] saved: {args.out} (legend at quadrant {best_q[0]},{best_q[1]})")
+
+    # 最后一步: 裁剪大片空白边
+    if args.crop:
+        g = cv2.cvtColor(overlay, cv2.COLOR_BGR2GRAY)
+        mask = g < 245  # 非空白像素
+        ys, xs = np.where(mask)
+        if len(xs):
+            x0 = max(0, xs.min() - args.crop_margin)
+            x1 = min(g.shape[1], xs.max() + args.crop_margin)
+            y0 = max(0, ys.min() - args.crop_margin)
+            y1 = min(g.shape[0], ys.max() + args.crop_margin)
+            cropped = overlay[y0:y1, x0:x1]
+            cv2.imwrite(args.out, cropped)
+            print(f"[sch_render] cropped to {cropped.shape[1]}x{cropped.shape[0]} @({x0},{y0})")
 
 
 if __name__ == "__main__":
