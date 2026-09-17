@@ -32,8 +32,8 @@
 每级产物都是 JSON (chain_order / config / wpts), 渲染只是派生视图。
 
 **PCB 侧定位工具** (辅助 ③ waypoint计算 + PCB 定位, 不参与原理图链学习):
-rectangle_locator / circle_locator (裁切) → label_ocr_scan (OCR refdes) →
-components_index.json (位置索引) → ic_package_detect (封装) / verify_anchor (校验)。
+pcb_rect_locator / pcb_circle_locator (裁切) → pcb_label_ocr (OCR refdes) →
+pcb_components.json (位置索引) → pcb_package (封装) / pcb_verify (校验)。
 它们给出元器件在 PCB 上的位置 (pcb_px, bot 已镜像), 供 make_config_from_chain
 回填 chain_order 与 signal_flow_route 布线计算。链序本身只由原理图学到。
 
@@ -41,28 +41,28 @@ components_index.json (位置索引) → ic_package_detect (封装) / verify_anc
 
 | 工具 | 作用 |
 |---|---|
-| `rectangle_locator/` | 全板矩形轮廓检测 → 分类 + 裁切 + crops_index |
-| `circle_locator/` | 全板圆形检测 (Hough+轮廓) → 分类 + 裁切 + crops_index |
-| `label_ocr_scan/` | 矩形+圆形裁切多角度 OCR, 识别全部 refdes (DML GPU 首选) |
-| `ic_package_detect/` | IC 封装定位: crop-ocr + 精确裁切验证 → body/package |
+| `pcb_rect_locator/` | 全板矩形轮廓检测 → 分类 + 裁切 + crops_index |
+| `pcb_circle_locator/` | 全板圆形检测 (Hough+轮廓) → 分类 + 裁切 + crops_index |
+| `pcb_label_ocr/` | 矩形+圆形裁切多角度 OCR, 识别全部 refdes (DML GPU 首选) |
+| `pcb_package/` | IC 封装定位: crop-ocr + 精确裁切验证 → body/package |
 | `signal_flow_route/` | 信号流自动路由: config → waypoints (最小交叉/避标签) |
 | `svg-render/svg_render.py` | 读 wpts 渲染信号流标注图 (PNG+SVG) |
-| `components_index/` | 元器件索引构建 (components_index.json) |
-| `verify_anchor/` | 坐标锚点验证 (OCR 误读/DPI 缩放/母图版本排查) |
+| `pcb_components/` | 元器件索引构建 (pcb_components.json) |
+| `pcb_verify/` | 坐标锚点验证 (OCR 误读/DPI 缩放/母图版本排查) |
 | `schematic_flow_walk/` | 原理图信号流走线: 彩线掩膜+BFS走线+符号检测+OCR关联 → chain_order |
 
 ## 典型操作
 
 ```bash
 # 1. 裁切定位
-python3 tools/rectangle_locator/rectangle_locator.py --pcb projects/icom2200h/render/pcb-top-600-1.png --out projects/icom2200h/crops/rectangle/
-python3 tools/circle_locator/circle_locator.py --pcb projects/icom2200h/render/pcb-top-600-1.png --out projects/icom2200h/crops/circle/
+python3 tools/pcb_rect_locator/pcb_rect_locator.py --pcb projects/icom2200h/render/pcb-top-600-1.png --out projects/icom2200h/crops/rectangle/
+python3 tools/pcb_circle_locator/pcb_circle_locator.py --pcb projects/icom2200h/render/pcb-top-600-1.png --out projects/icom2200h/crops/circle/
 
 # 2. 识别 refdes (Windows DML, 快)
 tools/run_label_ocr_dml.bat
 
 # 3. 封装定位 + 验证
-python3 tools/ic_package_detect/detect_ic.py crop-ocr \
+python3 tools/pcb_package/detect_ic.py crop-ocr \
   --crops projects/icom2200h/crops/rectangle/crops_index.json,projects/icom2200h/crops/rectangle_bot/crops_index.json \
   --refdes "IC4,IC12,IC6,IC11,IC1" --categories ic --local-ocr
 
@@ -86,19 +86,19 @@ python3 tools/signal_flow_route/signal_flow_route.py \
 | `poll_ocr/` | OCR 后台任务轮询 |
 | `multi_scale_ocr/` | 多尺度金字塔扫描 |
 | `annot_clean/` | 旧渲染版本清理 |
-| `ic_locator/` | IC 几何定位 (被 ic_package_detect 取代) |
+| `ic_locator/` | IC 几何定位 (被 pcb_package 取代) |
 
 ## 研发进度(2026-09-16)
 
 ### 已完成
-- 首选管线投产: rectangle+circle 裁切 → label_ocr_scan (DML) → components_index
+- 首选管线投产: rectangle+circle 裁切 → pcb_label_ocr (DML) → pcb_components
 - IC 封装定位: crop-ocr + 精确裁切验证 (本体≠标签, 过滤假匹配)
 - 信号流自动路由: signal_flow_route (最小交叉/避标签/实虚线/via/IC轮廓)
 - 渲染: svg_render (PNG+SVG, via/IC轮廓/箭头)
 - 坐标转换修复: 旋转 OCR 逆变换 (rot=90/270 不再偏移)
-- 元器件索引 components_index.json: 跨视图坐标枢纽 + 封装字段
+- 元器件索引 pcb_components.json: 跨视图坐标枢纽 + 封装字段
 
 ### 下一步
-- bot 视图圆形裁切 label_ocr_scan 全量跑 (已有 --limit 测试)
+- bot 视图圆形裁切 pcb_label_ocr 全量跑 (已有 --limit 测试)
 - TX 链条序入库
 - 控制信号(黄)层逐线标注

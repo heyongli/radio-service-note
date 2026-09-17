@@ -81,7 +81,7 @@
   - **radio-knowledge.md** (仓库根): 通用无线电知识, 所有项目可复用
   - **projects/<机型>/radio-design.md**: 工程特定 RX/TX/Control/Power 链 + 关键器件功能 + 调试点
 
-* **关键器件索引** (`projects/<机型>/nettable/components_index.json`) 每条
+* **关键器件索引** (`projects/<机型>/nettable/pcb_index.json`) 每条
   必须含 refdes/box/center/view + **role (功能) + flow_note (在链序中的具体作用)**。
 
 * **矩形裁切索引** (`projects/<机型>/nettable/rectangle_crops_index.json`) 每条

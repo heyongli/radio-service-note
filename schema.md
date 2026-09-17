@@ -30,7 +30,7 @@
   ↓ ai-ocr 或人工标注
 ocr box / 人工 anchor (在某 ocr 输出空间)
   ↓ 转换链 (scale, tile_pos, offset)
-components_index.json 的 tgt_dpi 空间 (统一 600dpi)
+pcb_index.json 的 tgt_dpi 空间 (统一 600dpi)
   ↓ 派生
 wpts_*.json (pcb 标注)
   ↓ svg_render.py
@@ -66,12 +66,12 @@ wpts_*.json (pcb 标注)
 - `box`: 4 顶点多边形 (在 ocr 输出空间)
 - `box_inch`: 4 顶点的物理 inch 坐标 (与 ocr_dpi 无关, 可追溯到 pdf)
 
-#### l4: components_index.json 的 tgt_dpi 空间
+#### l4: pcb_index.json 的 tgt_dpi 空间
 - `center` / `box`: 统一存放在某个 `tgt_dpi` (默认 600dpi)
 - `tgt_image`: 对应的 png 母图
 
 #### l5: 派生 wpts.json
-- `px` / `through`: 与 components_index 同 tgt_dpi 空间
+- `px` / `through`: 与 pcb_index 同 tgt_dpi 空间
 
 ### 1.3 任意 dpi 转换示例
 
@@ -94,7 +94,7 @@ box_600 = [[p[0]*3, p[1]*3] for p in ocr_box_200]
 ### 1.4 反向追溯: 任意坐标 -> pdf
 
 ```python
-# 从 components_index 600dpi 坐标 -> 原始 pdf 物理坐标
+# 从 pcb_index 600dpi 坐标 -> 原始 pdf 物理坐标
 center_inch = [c / 600 for c in ref['center']]
 center_pt = [c * 72 for c in center_inch]  # pt 单位
 
@@ -103,7 +103,7 @@ center_pt = [c * 72 for c in center_inch]  # pt 单位
 
 ---
 
-## 2. components_index.json 元数据规范
+## 2. pcb_index.json 元数据规范
 
 ### 2.1 顶层结构
 
@@ -251,9 +251,9 @@ def validate(ref, info):
 ### 2.6 rectangle_crops_index.json 元数据规范
 
 **用途**: 记录 PCB 母图上检测到的**所有矩形轮廓** (IC/电阻/电感/电容/三极管/连接器等),
-含 bbox/分类/裁切文件路径。由 `tools/rectangle_locator/rectangle_locator.py` 生成。
+含 bbox/分类/裁切文件路径。由 `tools/pcb_rect_locator/pcb_rect_locator.py` 生成。
 
-**与 components_index 的关系**: components_index 记录已知 refdes (通过 OCR/人工确认);
+**与 pcb_index 的关系**: pcb_index 记录已知 refdes (通过 OCR/人工确认);
 rectangle_crops_index 记录所有几何检测到的矩形 (尚未确认身份, 等待 OCR 验证)。
 
 **存放位置**: `projects/<机型>/crops/rectangle/crops_index.json` (与裁切图同目录)
@@ -264,8 +264,8 @@ rectangle_crops_index 记录所有几何检测到的矩形 (尚未确认身份, 
     "purpose": "PCB 全板矩形裁切索引 — 所有检测到的矩形轮廓, 含 bbox/pad/分类/裁切文件",
     "format": "json dict: _meta + _backtrace + board_bbox + rectangles[]",
     "version": "<semver> <date>",
-    "consumers": ["rectangle_locator/rectangle_locator.py", "tools/verify_anchor/verify_anchor.py"],
-    "tool": "tools/rectangle_locator/rectangle_locator.py",
+    "consumers": ["pcb_rect_locator/pcb_rect_locator.py", "tools/pcb_verify/pcb_verify.py"],
+    "tool": "tools/pcb_rect_locator/pcb_rect_locator.py",
     "tool_version": "<float>",
     "indexed_rectangles": <int>,
     "by_category": {"ic": <int>, "resistor": <int>, ...},
@@ -401,17 +401,17 @@ schematic_flow_walk ──► chain_order_rx.json ──► radio_design_flow (r
 
 - `sch_px` = 原理图坐标 (300dpi), 由 schematic_flow_walk 从彩线走线排定
 - `pcb_px` = PCB top 坐标 (600dpi, bot 已镜像), 由 make_config_from_chain
-  从 components_index 回填; 未定位留空 (不臆造)
+  从 pcb_index 回填; 未定位留空 (不臆造)
 - 下游 PCB 标注 (signal_flow_route) 只读 `pcb_px`, 生成 wpts
 
 ### 3.3 字段溯源要求
 
 - `sch_px` 必须含 `sch_image` + `sch_image_dpi`
-- `pcb_px` 必须含 `pcb_view`, 由 `components_index` 溯源
+- `pcb_px` 必须含 `pcb_view`, 由 `pcb_index` 溯源
 
-### 3.5 原理图元器件数据库 sch_components.json (像 PCB 侧 components_index 管理)
+### 3.5 原理图元器件数据库 sch_components.json (像 PCB 侧 pcb_index 管理)
 
-**定位**: 原理图侧识别+鉴别的中间数据库, 与 PCB 侧 `components_index.json` 对应。
+**定位**: 原理图侧识别+鉴别的中间数据库, 与 PCB 侧 `pcb_index.json` 对应。
 由 `schematic_flow_walk` 三层管线 (识别→鉴别→渲染) 生成, 是 sch 侧唯一权威库。
 
 ```json
@@ -460,7 +460,7 @@ schematic_flow_walk ──► chain_order_rx.json ──► radio_design_flow (r
 ```json
 {
   "description": "<标注描述>",
-  "source": "chain_order_*.json + components_index.json",
+  "source": "chain_order_*.json + pcb_index.json",
   "view": "pcb_top_600dpi|pcb_bot_600dpi",
   "dpi": <int>,                 // 与 view 后缀一致
   "tgt_image": "<母图>",
@@ -564,7 +564,7 @@ ASCII 树状图 (含所有文件/子目录), 每层/每个目录的"职责"一�
 
 | 文件 | 用途 |
 |---|---|
-| components_index.json | 元器件索引枢纽 |
+| pcb_index.json | 元器件索引枢纽 |
 | chain_order_rx.json | RX 链序 |
 | wpts_rx_top_v1.json | RX top 标注 |
 
@@ -572,7 +572,7 @@ ASCII 树状图 (含所有文件/子目录), 每层/每个目录的"职责"一�
 
 ```
 nettable/
-├── components_index.json   # 索引
+├── pcb_index.json   # 索引
 ├── chain_order_rx.json      # 链序
 ├── wpts_rx_top_v1.json      # waypoints
 ```
@@ -595,4 +595,4 @@ nettable/
 |---|---|---|
 | 0.3 | 2026-09-15 | 加入"schema.md 编写规范(五要素)"附录; 合并项目 schema.md |
 | 0.2 | 2026-09-15 | 加入 pdf backtrace 链, 实现任意缩放/转换无损 |
-| 0.1 | 2026-09-15 | 初版: 五要素总览 + components_index/chain_order/wpts 三类核心字段规范 |
+| 0.1 | 2026-09-15 | 初版: 五要素总览 + pcb_index/chain_order/wpts 三类核心字段规范 |

@@ -156,7 +156,7 @@
 ## 任务分工
 
 - **主控 (本机)**: 渲染底图 (pdftoppm 600/300dpi), 工具开发/参数调优,
-  waypoints 生成, SVG/PNG 标注, 结果合并入 components_index, 归档。
+  waypoints 生成, SVG/PNG 标注, 结果合并入 pcb_index, 归档。
 - **从机 (10.0.0.121)**: 重负载全板扫描 (600dpi 多引擎多朝向), 与本地
   并行为事后合并; 本地小图快速试参, 从机跑最终大图。
 
@@ -165,7 +165,7 @@
 1. `scp` 更新 `tools/zref/ai_ocr_eval/ai_refdes_ocr.py` 与待扫底图到从机。
 2. 远程执行 `./slave_remote.sh <top600|bot600|smoke|check|pull>`。
 3. `./slave_remote.sh pull` 可读各任务 result.json hits 数(远程已含该脚本)。
-4. 结果按 `--out-dpi 600` 空间回传, 主控 ÷2 转 300dpi 入 components_index,
+4. 结果按 `--out-dpi 600` 空间回传, 主控 ÷2 转 300dpi 入 pcb_index,
    坐标系转换参照 architecture.md §5A (每视图独立, 不得混用)。
 
 ## 从机任务类型

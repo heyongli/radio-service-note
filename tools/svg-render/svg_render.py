@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """tools/svg-render/svg_render.py - RX flow 渲染
 
-purpose: wpts + components_index → PNG/SVG 标注图 (PCB 顶视/底视, 信号流标注)
+purpose: wpts + pcb_components → PNG/SVG 标注图 (PCB 顶视/底视, 信号流标注)
 format: Python 3 + PIL + svgwrite
 version: 0.5.0 (2026-09-15 全参数化, 颜色/字号/halo/箭头 都 CLI 可调)
 consumers: 任何 RX flow 渲染, IC-2200H/类似 PCB 维修工程
@@ -15,7 +15,7 @@ consumers: 任何 RX flow 渲染, IC-2200H/类似 PCB 维修工程
   主流程线: 深绿 (0,140,0) / 虚线
   关键器件红点: 红 (200,0,0) + 黑心
   文字标签: 深蓝 (0,0,180) + 白色 halo (3px)
-  确认框 (components_index): 深蓝 (0,0,180)
+  确认框 (pcb_components): 深蓝 (0,0,180)
   旁路/控制框: 紫红 (160,0,160)
   notes 文字: 黑 + 白 halo
 """
@@ -168,7 +168,7 @@ def render_png(wpts, base, comp_idx, args):
     W, H = base.size
     draw = ImageDraw.Draw(base)
 
-    # 确认框 (components_index) - 深蓝, 不画 box 内文字 (避免与 mark 重叠)
+    # 确认框 (pcb_components) - 深蓝, 不画 box 内文字 (避免与 mark 重叠)
     if comp_idx and not args.skip_confirm_boxes:
         for ref, info in comp_idx.items():
             box = info.get("box") or []
@@ -606,7 +606,7 @@ def main():
     ap.add_argument("--dash-pattern", default=DEFAULTS['dash_pattern'])
     # === 开关 ===
     ap.add_argument("--skip-confirm-boxes", action="store_true",
-                    help="跳过 components_index 的青色确认框 (避免视觉噪音)")
+                    help="跳过 pcb_components 的青色确认框 (避免视觉噪音)")
     args = ap.parse_args()
     if args.out_svg is None:
         args.out_svg = str(Path(args.out_png).with_suffix(".svg"))

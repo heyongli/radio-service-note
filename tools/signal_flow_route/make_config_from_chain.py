@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """tools/signal_flow_route/make_config_from_chain.py - 链序→路由 config 自动桥接
 
-purpose: 从 chain_order_*.json (原理图链序) + components_index.json (PCB 位置)
+purpose: 从 chain_order_*.json (原理图链序) + pcb_components.json (PCB 位置)
         自动生成 signal_flow_route 的路由 config (rx_flow_config.json),
         实现 schematic_flow_walk → PCB 标注的完整自动化
 format: Python 3
@@ -9,7 +9,7 @@ version: 0.1 (2026-09-16)
 
 用法:
   python3 make_config_from_chain.py --chain chain_order_rx.json \
-      --index components_index.json --out rx_flow_config.json \
+      --index pcb_components.json --out rx_flow_config.json \
       [--mirror-x 2530]
 """
 
@@ -20,7 +20,7 @@ from pathlib import Path
 
 
 def pcb_position(refdes, index, mirror_x=None):
-    """从 components_index 取 PCB 位置. 返回 (x, y, view) 或 None.
+    """从 pcb_components 取 PCB 位置. 返回 (x, y, view) 或 None.
     index 里的 bot 视图坐标用 mirror_x 镜像到 top (渲染空间)."""
     info = index.get(refdes)
     if not info or not isinstance(info, dict):
@@ -38,7 +38,7 @@ def pcb_position(refdes, index, mirror_x=None):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--chain", required=True, help="chain_order_rx.json (schematic_flow_walk 输出)")
-    ap.add_argument("--index", required=True, help="components_index.json (pcb_px 缺失时回查)")
+    ap.add_argument("--index", required=True, help="pcb_components.json (pcb_px 缺失时回查)")
     ap.add_argument("--out", required=True, help="输出路由 config (rx_flow_config.json)")
     ap.add_argument("--mirror-x", type=float, default=None,
                     help="bot→top 镜像中心 x; 不指定则用板中心推算")

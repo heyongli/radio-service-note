@@ -165,7 +165,7 @@ pdftoppm -r 600 -png xx-top.pdf top600
 
 ## 5c. IC 封装定位三法(pin-silk / body / contour)
 
-**工具: `tools/ic_package_detect/detect_ic.py`(CLI, 方法+实测值见其 README)。**
+**工具: `tools/pcb_package/detect_ic.py`(CLI, 方法+实测值见其 README)。**
 
 1. **pin-silk(首选)**: PCB 视图 PDF 文本层的引脚号丝印(孤立 "1"/"16"/"8"/"9")
    → 同行成对=同边角引脚, x 相近的两对=同一 IC 对边 → 内插**全引脚坐标+方向**,
@@ -215,11 +215,11 @@ pdftoppm -r 600 -png xx-top.pdf top600
 - 脚本与文档放 `tools/<tool名>/`,各自目录带 README.md;
 - 产出分类放独立目录,**禁止混放**(含旧 `extract/`,已废弃删除):
   `render/`=PDF 渲染底图、`crops/`=切片/裁切+索引、`nettable/`=网表 JSON
-  (含 waypoints/SCHEMA.md/components_index)、`annot/`=标注成品(**仅** SVG+PNG, 严禁子目录)、
+  (含 waypoints/SCHEMA.md/pcb_index)、`annot/`=标注成品(**仅** SVG+PNG, 严禁子目录)、
   `svg_runs/`=SVG 渲染归档(含参数快照)、`ocr_runs/`=AI-OCR 运行归档(只增不删,
   严禁 annot/crops/svg_runs 子目录); 详见 architecture.md 第 0 章;
 - 新增目录约定(2026-09-10): `nettable/ai_ocr_runs/`=AI-OCR 运行归档(只增
-  不删)、`nettable/components_index.json`=元器件索引(枢纽, 必须保持新鲜)、
+  不删)、`nettable/pcb_index.json`=元器件索引(枢纽, 必须保持新鲜)、
   `svg_runs/`=SVG 渲染归档(2026-09-15 从 annot/ 提升至项目根);
 - 临时中间件放 `/tmp/opencode/`(600dpi 大图等),网表 JSON 里记录其路径。
 
@@ -229,9 +229,9 @@ pdftoppm -r 600 -png xx-top.pdf top600
   `example/talkabout-bot.svg` 分层原则; 底图 base64 内嵌+图层锁定;
   实线=确认/虚线=推断/not-located 进 notes 层。旧 raster 标注
   (add_photo_wpts) 保留给照片场景。
-- **waypoints 从 components_index 生成**(`make_wpts_from_index.py`),
+- **waypoints 从 pcb_index 生成**(`make_wpts_from_index.py`),
   不再手写; 信号流跨图(原理图链序→PCB 落点)一律经
-  `nettable/components_index.json` 解析坐标(架构见 architecture.md)。
+  `nettable/pcb_index.json` 解析坐标(架构见 architecture.md)。
 - **nettable 数据规范**见 `projects/<机型>/nettable/SCHEMA.md`:
   300dpi 统一坐标空间、provenance 必填、状态三态、revisions 留痕。
 - 中间结果常态化保存: AI 运行 JSON 归档 `ocr_runs/`(2026-09-15 移出
@@ -263,11 +263,11 @@ pdftoppm -r 600 -png xx-top.pdf top600
 - 用了 v8 时代的坐标 (1646, 1159) (F13)
 - 但 v8 坐标来自**300dpi 图像** OCR, v10 渲染到 **600dpi 底图**
 - 300dpi → 600dpi 直接嵌入 → 实际渲染的 F13 位置是 v8 的 2 倍偏移
-- 用工具 `verify_anchor.py` 验证: 在 v10 给的坐标处裁切 PCB 图, OCR 找不到 F13
+- 用工具 `pcb_verify.py` 验证: 在 v10 给的坐标处裁切 PCB 图, OCR 找不到 F13
 
-### 11.2 正解: verify_anchor 自检
+### 11.2 正解: pcb_verify 自检
 
-工具: `tools/verify_anchor/verify_anchor.py` (新建)
+工具: `tools/pcb_verify/pcb_verify.py` (新建)
 
 **核心思想**: 坐标可能错位, 唯一权威验证 = **回到 PCB 母图, 裁切坐标周围, 重新 OCR, 看是否识别出相同 refdes**。
 
@@ -286,8 +286,8 @@ for ref, x, y in coords:
 ### 11.3 验证流程 (OCR 工具产出索引后必走)
 
 1. **OCR 跑完一轮** (如 `ai_refdes_ocr.py` 跑 `pcb-top-600-1.png`)
-2. **聚合**: 从 `raw_stage1` + `raw_stage2` 聚合 refdes → components_index.json
-3. **校验 (新)**: 用 `verify_anchor.py` 对**每个关键 refdes** 做自检
+2. **聚合**: 从 `raw_stage1` + `raw_stage2` 聚合 refdes → pcb_index.json
+3. **校验 (新)**: 用 `pcb_verify.py` 对**每个关键 refdes** 做自检
 4. **mismatch 处理**:
    - 重新跑 OCR (换引擎/参数)
    - 检查缩放/坐标变换是否正确
@@ -306,7 +306,7 @@ for ref, x, y in coords:
 
 ```bash
 # 验证 v10 关键节点 (示例)
-python3 tools/verify_anchor/verify_anchor.py \
+python3 tools/pcb_verify/pcb_verify.py \
     --pcb projects/icom2200h/render/pcb-top-600-1.png \
     --coords "(1277,1489)=J11 (1646,1159)=F13 (1547,1159)=F14 (1714,1385)=IC12 (1726,709)=D12 (1671,807)=D27 (1919,1094)=FI1 (1921,1345)=FI2" \
     --crop-size 350x230 \
@@ -318,15 +318,15 @@ python3 tools/verify_anchor/verify_anchor.py \
 
 ### 11.6 与 schema.md 的关系
 
-verify_anchor 是 schema.md §5B "数据溯源规范"的具体实施工具:
+pcb_verify 是 schema.md §5B "数据溯源规范"的具体实施工具:
 - 每个 refdes 坐标必须**可验证** (回到母图 OCR 仍识别到)
 - 任何坐标变更必须先验证再入库
 - 不验证的坐标等同"临时数据", 应标 `validated: false`
 
 ### 11.7 与 best_practices §10 的关系
 
-§10 定义"小工具创建规范" — verify_anchor 是该规范的典型应用:
-- 路径在 `tools/verify_anchor/`
+§10 定义"小工具创建规范" — pcb_verify 是该规范的典型应用:
+- 路径在 `tools/pcb_verify/`
 - readme.md (五要素设计文档)
 - 全参数 CLI 化
 - 头部 docstring 含 purpose/format/version/consumers
@@ -402,10 +402,10 @@ python.exe C:\Users\radio\tools_full\ai_refdes_ocr.py  # ModuleNotFoundError
 cmd.exe /c "\"C:\\Users\\radio\\ocr_gpu_venv\\Scripts\\python.exe\" \"C:\\Users\\radio\\tools_full\\ai_refdes_ocr.py\" --img \\\"/mnt/c/...\\\"\"  # 解析错乱
 ```
 
-### 12.6 验证工具: `tools/verify_anchor/`
+### 12.6 验证工具: `tools/pcb_verify/`
 
 完整实现了 §12.3 模式 + OCR 验证 + match/mismatch 报告。
-详见 `tools/verify_anchor/readme.md`。
+详见 `tools/pcb_verify/readme.md`。
 
 ### 11.8 真实案例: v10 错位 2x 教训
 
@@ -420,7 +420,7 @@ cmd.exe /c "\"C:\\Users\\radio\\ocr_gpu_venv\\Scripts\\python.exe\" \"C:\\Users\
 **教训**:
 1. **跨 DPI 空间坐标不能直接嵌入**, 必须按 scale 转换 (300dpi → 600dpi 应 ×2)
 2. **从历史数据继承坐标时**, 必须验证 src_dpi 和 tgt_dpi 是否一致
-3. **渲染前必须 verify_anchor 自检**, 在 v10 坐标处裁切 PCB 图, OCR 跑一次, 看识别结果
+3. **渲染前必须 pcb_verify 自检**, 在 v10 坐标处裁切 PCB 图, OCR 跑一次, 看识别结果
 4. **板边铆钉校验是必要的**: J11 (2556, 2978) 在 OCR 找到的位置, 但 y=2978 超板边 y=2929,
    仍在板上标签区(印刷区 label 237 = (2572-3290, 2966-3276))
 
@@ -429,7 +429,7 @@ cmd.exe /c "\"C:\\Users\\radio\\ocr_gpu_venv\\Scripts\\python.exe\" \"C:\\Users\
 **流程**:
 1. 跑 OCR v12 (Windows DML, 600dpi 全图, v4+v5s 双引擎) → 144 hits, 47 agree
 2. 用 OCR 真实坐标 (而非历史坐标) 写 wpts_rx_top_v11.json
-3. F13/F14/IC12/Q27/IC4/D23 OCR 仍没找到 → 标"待 verify_anchor"虚位, 不作主流程锚点
+3. F13/F14/IC12/Q27/IC4/D23 OCR 仍没找到 → 标"待 pcb_verify"虚位, 不作主流程锚点
 4. 红点聚类精度 0px (renderer 渲染位置完全落在 OCR 报告位置)
 
 **验证方法**: 红点聚类 (scipy.ndimage.label) 找红色像素的中心, 应等于 OCR 报告的 (cx, cy)。
@@ -471,7 +471,7 @@ cmd.exe /c "\"C:\\Users\\radio\\ocr_gpu_venv\\Scripts\\python.exe\" \"C:\\Users\
 
 **规则**:
 - **OCR 输出永远不可信** (含 1↔I 等误识别), 必须用 chain_order 上下文校正
-- **校正后必须 verify_anchor 验证** (裁切+OCR 自检)
+- **校正后必须 pcb_verify 验证** (裁切+OCR 自检)
 - **校正写入 _meta.correction**: 保留原始 OCR 文本, 标记修正原因, 可追溯
 
 ## 13. 经验教训

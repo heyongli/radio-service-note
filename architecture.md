@@ -15,18 +15,18 @@ radio-service-note/
 ├── TODO.md                     # 后续路线
 ├── schema.md                   # 全局 JSON 字段规范
 ├── tools/                      # 核心工具代码
-│   ├── rectangle_locator/      # 矩形轮廓检测 + 裁切
-│   ├── circle_locator/         # 圆形轮廓检测 + 裁切
+│   ├── pcb_rect_locator/      # 矩形轮廓检测 + 裁切
+│   ├── pcb_circle_locator/         # 圆形轮廓检测 + 裁切
 │   ├── ic_ocr_scan/            # 多角度 OCR (CPU/DML)
-│   ├── ic_package_detect/      # IC 封装定位
+│   ├── pcb_package/      # IC 封装定位
 │   ├── svg-render/             # 信号流标注渲染 (PNG+SVG)
 │   ├── signal_flow_route/      # 信号流自动路由
-│   ├── components_index/       # 元器件索引构建
-│   ├── verify_anchor/          # 坐标锚点验证
+│   ├── pcb_components/       # 元器件索引构建
+│   ├── pcb_verify/          # 坐标锚点验证
 │   └── ref/                    # 参考/旧管线 (ai_ocr_eval, annotate_svg_flow 等)
 ├── projects/
 │   └── <机型>/                 # 例如 icom2200h
-│       ├── components_index.json   # 元器件索引(枢纽)
+│       ├── pcb_components.json   # 元器件索引(枢纽)
 │       ├── radio-design.md         # 工程特定设计文档
 │       ├── nettable/               # 结构化数据库
 │       │   └── wpts_*.json         # waypoints
@@ -47,8 +47,8 @@ radio-service-note/
 | 目录 | 方向 | 内容 | 负责工具 |
 |------|------|------|----------|
 | `render/` | 只读输入 | pdftoppm 输出的 PCB 光栅图 | pdf→png |
-| `crops/rectangle/` | 中间产物 | 矩形裁切 + 索引 | `rectangle_locator.py` |
-| `crops/circle/` | 中间产物 | 圆形裁切 + 索引 | `circle_locator.py` |
+| `crops/rectangle/` | 中间产物 | 矩形裁切 + 索引 | `pcb_rect_locator.py` |
+| `crops/circle/` | 中间产物 | 圆形裁切 + 索引 | `pcb_circle_locator.py` |
 | `annot/` | 最终输出 | **仅** SVG + PNG 标注图 | `svg_render.py` |
 | `nettable/` | 结构化数据库 | waypoints/链序/锚点 JSON | OCR → 索引 |
 | `ocr_runs/` | 只读归档 | OCR 运行 JSON 归档 | `tools/zref/ai_ocr_eval/ai_refdes_ocr.py` |
@@ -69,14 +69,14 @@ radio-service-note/
 维修手册 PDF ──pdftoppm 600dpi──> render/(光栅底图)
                 │
                 ▼
-rectangle_locator.py ──> crops/rectangle/*.png + crops_index.json
-circle_locator.py    ──> crops/circle/*.png + crops_index.json
+pcb_rect_locator.py ──> crops/rectangle/*.png + crops_index.json
+pcb_circle_locator.py    ──> crops/circle/*.png + crops_index.json
                 │
                 ▼
 ic_ocr_scan_dml.py (Windows DirectML GPU)
                 │
                 ▼
-nettable/components_index.json   ← 枢纽: 元器件索引
+nettable/pcb_components.json   ← 枢纽: 元器件索引
 (ref-des → 类型/名称/各视图坐标/来源/状态)
                 │
     ┌───────────┼───────────┐
@@ -107,7 +107,7 @@ SVG 分层标注 ──> annot/*.svg + .png
 3. **丝印只在一面的器件**: 哪个 view 的 OCR 找到, 坐标就属于哪个 view
 4. **不能跨 view 共享坐标**: 同一物理点在不同图像中像素坐标不同
 
-**components_index 强约束**:
+**pcb_components 强约束**:
 ```json
 {
   "F13": {
@@ -128,7 +128,7 @@ PCB 母图 (render/pcb-top-600-1.png, 5100×6600 @ 600dpi)
   │
   ├── crops/rectangle/crops_index.json  ← 矩形索引 (bbox 在母图坐标)
   │
-  └── nettable/components_index.json  ← 元器件索引 (center/box 在母图坐标)
+  └── nettable/pcb_components.json  ← 元器件索引 (center/box 在母图坐标)
 ```
 
 **坐标转换公式**:
@@ -169,10 +169,10 @@ rot=270: ox = Wc - 1 - ry, oy = rx            (Wc = 原始 crop 宽度)
 ```
 PCB 母图
   │
-  ├── rectangle_locator.py (OpenCV 轮廓检测 + 分类)
+  ├── pcb_rect_locator.py (OpenCV 轮廓检测 + 分类)
   │     → crops/rectangle/*.png + crops_index.json
   │
-  ├── circle_locator.py (HoughCircles + 轮廓圆度)
+  ├── pcb_circle_locator.py (HoughCircles + 轮廓圆度)
   │     → crops/circle/*.png + crops_index.json
   │
   ▼
@@ -180,10 +180,10 @@ ic_ocr_scan_dml.py (Windows DirectML GPU, 多角度 OCR)
   │ → 读 crops_index.json
   │ → 对每个裁切: 旋转 0°/90°/270° → OCR → 取最高分 refdes
   │ → 坐标转换: crop_local + bbox_offset = 母图坐标
-  │ → 写 nettable/components_index.json
+  │ → 写 nettable/pcb_components.json
   │
   ▼
-components_index.json (合并矩形+圆形结果)
+pcb_components.json (合并矩形+圆形结果)
 ```
 
 ### 3.2 实测结果 (IC-2200H)
@@ -198,7 +198,7 @@ components_index.json (合并矩形+圆形结果)
 
 ### 3.3 矩形检测参数
 
-**rectangle_locator.py**:
+**pcb_rect_locator.py**:
 - `--min-area 200` — 最小矩形面积
 - `--max-area 500000` — 最大矩形面积
 - `--aspect-ratio 0.2-5.0` — 长宽比范围
@@ -207,7 +207,7 @@ components_index.json (合并矩形+圆形结果)
 
 ### 3.4 圆形检测参数
 
-**circle_locator.py**:
+**pcb_circle_locator.py**:
 - `--min-diameter 120` — 过滤小 pad 噪声
 - `--max-diameter 200` — 过滤板框
 - `--circularity-min 0.7` — 过滤不规则形状
@@ -222,9 +222,9 @@ components_index.json (合并矩形+圆形结果)
 - 验证: PowerShell `Get-Counter '\GPU Engine(*)\Utilization Percentage'`
 - 实测: AMD RX 590 GME 上 28x 加速, 200 矩形 ~2min
 
-### 3.6 crops_index 与 components_index 的关系
+### 3.6 crops_index 与 pcb_components 的关系
 
-| 字段 | crops_index | components_index |
+| 字段 | crops_index | pcb_components |
 |---|---|---|
 | bbox/center | ✓ (母图坐标) | ✓ (母图坐标) |
 | category | ✓ (ic/resistor/...) | ✗ (用 refdes 前缀推断) |
@@ -232,7 +232,7 @@ components_index.json (合并矩形+圆形结果)
 | refdes | ✓ (OCR 找到的位号) | ✓ (key) |
 | role/flow_note | ✗ | ✓ (功能描述) |
 
-**规则**: crops_index 是中间产物, components_index 是最终产物。
+**规则**: crops_index 是中间产物, pcb_components 是最终产物。
 
 ### 3.7 替代方案对比 (参考)
 
@@ -381,7 +381,7 @@ tools/<tool_name>/
 
 ### 8.2 标注流程
 
-- 信号流跨图标注一律经元器件索引 `components_index.json`
+- 信号流跨图标注一律经元器件索引 `pcb_components.json`
 - 生成 waypoints 用 `make_wpts_from_index.py`, 不手写坐标
 - 分层 SVG, 实线=确认/虚线=推断/not-located 不臆造
 
@@ -425,16 +425,33 @@ tools/<tool_name>/
 
 将探索阶段验证过的方法和原则固化为可复用工具, 确保流程一致、可追溯。
 
+**三大工作管线** (各自独立, 职责分离):
+```
+① sch 管线   : 原理图识别信号流 → chain_order
+② pcb 管线   : PCB 定位元器件 → components_index (pcb 位置)
+③ 结合管线   : sch flow + pcb 位置 → waypoint → 标注 (sch→PCB)
+```
+
+### 13.0 管线总览
+| 管线 | 工具链 | 产物 | 职责 |
+|---|---|---|---|
+| **sch** | `sch_trace` → `sch_label_ocr` → `sch_flow_walk` → `sch_render` | chain_order_rx.json | 从原理图学信号流经元器件 |
+| **pcb** | `pcb_rect_locator` → `pcb_circle_locator` → `pcb_label_ocr` → `pcb_components` → `pcb_package` → `pcb_verify` | pcb_components.json | 定位元器件在 PCB 的位置 |
+| **结合** | `make_config_from_chain` → `signal_flow_route` → `svg_render` | wpts + annot PNG/SVG | 把 sch flow 标注到 PCB |
+
+- sch/pcb 各自独立发展, 只通过 chain_order / pcb_components 数据库交互
+- 结合管线消费两者: chain_order (sch 链序) + pcb_components (pcb 位置) → 标注
+
 ### 13.1 OCR 识别
 | 工具 | 路径 | 用途 |
 |---|---|---|
-| `rectangle_locator.py` | `tools/rectangle_locator/` | 矩形轮廓检测, 定位 refdes 标号 |
-| `circle_locator.py` | `tools/circle_locator/` | 圆形轮廓检测, 补充识别 |
-| `label_ocr_scan_dml.py` | `tools/label_ocr_scan/` | 矩形+圆形裁切多角度 OCR (DML GPU) |
-| `detect_ic.py` | `tools/ic_package_detect/` | IC 封装定位: 矩形+圆形裁切+旋转OCR+refdes 匹配 → 本体框 |
+| `pcb_rect_locator.py` | `tools/pcb_rect_locator/` | 矩形轮廓检测, 定位 refdes 标号 |
+| `pcb_circle_locator.py` | `tools/pcb_circle_locator/` | 圆形轮廓检测, 补充识别 |
+| `pcb_label_ocr_dml.py` | `tools/pcb_label_ocr/` | 矩形+圆形裁切多角度 OCR (DML GPU) |
+| `detect_ic.py` | `tools/pcb_package/` | IC 封装定位: 矩形+圆形裁切+旋转OCR+refdes 匹配 → 本体框 |
 | `schematic_flow_walk.py` | `tools/schematic_flow_walk/` | 原理图信号流走线: 彩线掩膜+BFS+符号检测 → chain_order |
 
-**detect_ic.py crop-ocr (IC 本体定位首选)**: 配合 rectangle/circle_locator 的裁切,
+**detect_ic.py crop-ocr (IC 本体定位首选)**: 配合 rectangle/pcb_circle_locator 的裁切,
 旋转 OCR 读到已知 refdes 的裁切 bbox 即 IC 本体。默认用预计算 DML OCR 结果,
 `--local-ocr` 兜底。**本体中心 ≠ 标签文字中心**, 轮廓框必须用本体 bbox。
 命中必须**精确裁切验证** (沿 bbox 裁切源图再 OCR, 只有该 refdes 才算真命中),
@@ -449,7 +466,7 @@ rot=90:  ox = ry,        oy = Hc - 1 - rx     (Hc = 原始 crop 高度)
 rot=270: ox = Wc - 1 - ry, oy = rx            (Wc = 原始 crop 宽度)
 ```
 已固化在 `ic_ocr_scan.py` + `ic_ocr_scan_dml.py` 的 `ocr_crop`。
-曾导致 components_index 345 处 rot≠0 坐标偏移 (如 IC12 从错误的 (3555,2719)
+曾导致 pcb_components 345 处 rot≠0 坐标偏移 (如 IC12 从错误的 (3555,2719)
 校正到正确的 (3429,2768))。任何"变换后再识别"的中间结果, box 必须逆变换回源空间。
 
 ### 13.2 信号流渲染
