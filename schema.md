@@ -33,7 +33,7 @@ ocr box / 人工 anchor (在某 ocr 输出空间)
 components_index.json 的 tgt_dpi 空间 (统一 600dpi)
   ↓ 派生
 wpts_*.json (pcb 标注)
-  ↓ render_rx_flow.py / annotate_svg_flow.py
+  ↓ svg_render.py
 最终 svg/png 标注 (给读者看)
 ```
 
@@ -355,29 +355,40 @@ r{idx:04d}_{category}_{cx}x{cy}_w{w}h{h}.png
 
 ---
 
-## 3. chain_order_*.json 元数据规范
+## 3. chain_order_*.json 元数据规范 (流经元器件图)
+
+**定位**: 这是**中间数据结构**——原理图学到的信号流经元器件图 (固定格式)。
+串联三端:
+```
+schematic_flow_walk ──► chain_order_rx.json ──► radio_design_flow (radio-design.md 流经图)
+                          │
+                          └──► make_config_from_chain ──► signal_flow_route ──► PCB 标注
+```
+本结构 = 信号流经元器件的**权威有序列表**, 任何下游 (框图/PCB 标注/设计文档) 只读它。
 
 ### 3.1 顶层
 
 ```json
 {
   "_meta": {
-    "purpose": "<机型> <链名> (sch 坐标)",
+    "purpose": "<机型> <链名> (流经元器件图)",
     "format": "json {chain[], auxiliary[]}",
     "version": "<semver>",
-    "consumers": ["wpts_*.json 派生", "radio-design.md"],
-    "source": "schematic_ocr + 人工"
+    "consumers": ["radio-design.md 流经图", "make_config_from_chain.py"],
+    "source": "schematic_flow_walk (彩线掩膜+BFS+符号+OCR)"
   },
   "chain": [
     {
-      "idx": <int>,           // 1-based 链序号
+      "idx": <int>,           // 1-based 链序号 (信号流经顺序)
       "name": "<显示名>",
-      "refdes": "<r/c>",      // 可 null
+      "refdes": "<r/c>",      // 可 null (如 BPF 无位号)
       "role": "<功能>",
-      "type": "<connector|filter|amplifier|mixer|detector>",
+      "type": "<connector|filter|amplifier|mixer|detector|oscillator>",
       "sch_px": [x, y],      // sch 300dpi 空间
       "sch_image": "<sch 母图>",
       "sch_image_dpi": <int>,
+      "pcb_px": [x, y],      // PCB top 600dpi 空间 (bot 已镜像), 可缺省
+      "pcb_view": "top|bot",
       "status": "confirmed|unverified|inferred"
     },
     ...
@@ -386,9 +397,38 @@ r{idx:04d}_{category}_{cx}x{cy}_w{w}h{h}.png
 }
 ```
 
-### 3.2 sch_px 字段必须含 sch_image + sch_image_dpi
+### 3.2 跨视图关联 (sch → pcb)
 
-因为原理图可能有多页/多版本, 溯源到具体 pdf + 页码才能任意缩放。
+- `sch_px` = 原理图坐标 (300dpi), 由 schematic_flow_walk 从彩线走线排定
+- `pcb_px` = PCB top 坐标 (600dpi, bot 已镜像), 由 make_config_from_chain
+  从 components_index 回填; 未定位留空 (不臆造)
+- 下游 PCB 标注 (signal_flow_route) 只读 `pcb_px`, 生成 wpts
+
+### 3.3 字段溯源要求
+
+- `sch_px` 必须含 `sch_image` + `sch_image_dpi`
+- `pcb_px` 必须含 `pcb_view`, 由 `components_index` 溯源
+
+### 3.4 原理图 refdes 位置 JSON (schematic_flow_walk 输入)
+
+`schematic_flow_walk --refdes` 的输入: 原理图上已定位的 refdes 列表
+(OCR 网格 tile 识别, 600dpi 空间)。用于断口附近 OCR 关联最相关元器件。
+
+```json
+[
+  {"refdes": "Q27", "x": 1532, "y": 858,
+   "role": "RF-AMP", "category": "transistor"}
+]
+```
+
+| 字段 | 类型 | 必填 | 含义 |
+|---|---|---|---|
+| `refdes` | str | ✓ | 位号 (IC/Q/C/R/L/F...) |
+| `x` / `y` | int | ✓ | 原理图文字位置 (600dpi) |
+| `role` | str | | 功能 (可选) |
+| `category` | str | | 类型 (可选, 辅助类型匹配) |
+
+坐标空间与 `--img` 一致 (600dpi 原理图)。
 
 ---
 

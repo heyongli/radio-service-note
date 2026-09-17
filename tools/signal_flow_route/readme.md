@@ -117,7 +117,7 @@ keep-out 矩形尺寸: `宽度 = len(name) × fs × 0.6 + margin`, `高度 = fs 
 
 ### 输出格式
 
-输出 wpts JSON, 格式与 `render_rx_flow.py` 兼容:
+输出 wpts JSON, 格式与 `svg_render.py` 兼容:
 
 **line 条目** (信号连线):
 ```json

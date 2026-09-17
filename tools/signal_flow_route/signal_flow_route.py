@@ -219,7 +219,7 @@ def build_wpts(results, coords, components):
         "_meta": {
             "purpose": "Auto-routed RX flow waypoints v18 (label-aware, via, IC outline)",
             "version": "18",
-            "consumers": ["tools/render_rx_flow.py"],
+            "consumers": ["tools/svg-render/svg_render.py"],
             "view": "pcb_top_600dpi",
             "note": "Algorithm: minimize crossings + proximity + label zones; via + IC outline"
         }
@@ -301,7 +301,7 @@ def main():
     if args.out_png and args.pcb:
         import subprocess
         cmd = [
-            sys.executable, "tools/render_rx_flow.py",
+            sys.executable, "tools/svg-render/svg_render.py",
             "--pcb", args.pcb,
             "--wpts", args.out,
             "--skip-confirm-boxes",

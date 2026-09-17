@@ -430,8 +430,9 @@ tools/<tool_name>/
 |---|---|---|
 | `rectangle_locator.py` | `tools/rectangle_locator/` | 矩形轮廓检测, 定位 refdes 标号 |
 | `circle_locator.py` | `tools/circle_locator/` | 圆形轮廓检测, 补充识别 |
-| `ic_ocr_scan_dml.py` | `tools/ic_ocr_scan/` | Windows DirectML GPU 加速 OCR |
+| `label_ocr_scan_dml.py` | `tools/label_ocr_scan/` | 矩形+圆形裁切多角度 OCR (DML GPU) |
 | `detect_ic.py` | `tools/ic_package_detect/` | IC 封装定位: 矩形+圆形裁切+旋转OCR+refdes 匹配 → 本体框 |
+| `schematic_flow_walk.py` | `tools/schematic_flow_walk/` | 原理图信号流走线: 彩线掩膜+BFS+符号检测 → chain_order |
 
 **detect_ic.py crop-ocr (IC 本体定位首选)**: 配合 rectangle/circle_locator 的裁切,
 旋转 OCR 读到已知 refdes 的裁切 bbox 即 IC 本体。默认用预计算 DML OCR 结果,
