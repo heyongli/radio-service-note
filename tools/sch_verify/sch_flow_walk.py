@@ -72,8 +72,8 @@ def verify(components, green, band=14, touch_r=25, side=(30, 70)):
     return out
 
 
-def _ocr_reads_ref(gray, ocr, x, y, refdes, radius=50):
-    """在 (x,y) 反向 OCR, 尝试 4 个旋转, 返回是否读出 refdes (含 1↔I 修正)."""
+def _ocr_reads_ref(gray, ocr, x, y, refdes, radius=50, rots=(0,)):
+    """在 (x,y) 反向 OCR (旋转集, 默认 0 快速), 返回是否读出 refdes (含 1↔I 修正)."""
     def norm(s):
         return s.replace("I", "1").replace("L", "1")
     tgt = norm(refdes)
@@ -83,6 +83,8 @@ def _ocr_reads_ref(gray, ocr, x, y, refdes, radius=50):
     base = cv2.resize(sub, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_CUBIC)
     for rot, code in [(0, None), (90, cv2.ROTATE_90_CLOCKWISE),
                       (180, cv2.ROTATE_180), (270, cv2.ROTATE_90_COUNTERCLOCKWISE)]:
+        if rot not in rots:
+            continue
         im = cv2.rotate(base, code) if code is not None else base
         res, _ = ocr(im)
         if not res:
@@ -172,8 +174,16 @@ def main():
     db["_meta"]["verify"] = f"{args.color} flow membership"
     if not args.no_verify:
         from rapidocr_onnxruntime import RapidOCR
-        reverse_ocr_verify(cv2.cvtColor(cv2.imread(args.img), cv2.COLOR_BGR2GRAY),
-                           RapidOCR(), db["components"])
+        gray = cv2.cvtColor(cv2.imread(args.img), cv2.COLOR_BGR2GRAY)
+        ocr = RapidOCR()
+        syms = db.get("symbols", [])
+        # 1) 验证+纠正符号中心
+        reverse_ocr_verify(gray, ocr, db["components"], syms, correct=True)
+        # 2) 纠正后重新跑 membership (纠正的位置可能触点绿线)
+        db["components"] = verify(db["components"], mask, args.band, args.touch_r,
+                                  tuple(int(v) for v in args.side_dist.split(",")))
+        # 3) 重新验证
+        reverse_ocr_verify(gray, ocr, db["components"], syms, correct=False)
     with open(args.db, "w") as f:
         json.dump(db, f, indent=2, ensure_ascii=False)
 

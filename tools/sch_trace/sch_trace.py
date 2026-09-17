@@ -140,6 +140,7 @@ def main():
     ap.add_argument("--circle-area", type=str, default="600,60000", help="三极管圆面积范围")
     ap.add_argument("--ic-area", type=str, default="4000,250000", help="IC 矩形面积范围")
     ap.add_argument("--touch-r", type=int, default=30, help="符号触点绿线判定半径")
+    ap.add_argument("--circle-circ", type=float, default=0.7, help="三极管圆度阈值")
     args = ap.parse_args()
 
     cap_gap = tuple(int(v) for v in args.cap_gap.split(","))
@@ -164,23 +165,19 @@ def main():
         if reach[max(0, c["y"] - args.touch_r):c["y"] + args.touch_r, max(0, c["x"] - args.touch_r):c["x"] + args.touch_r].sum() > 0:
             symbols.append({"x": int(c["x"]), "y": int(c["y"]), "w": int(c["w"]),
                             "h": int(c["h"]), "sym": "cap"})
-    # 圆 (三极管) + IC, 触点绿线路径者
-    _, th = cv2.threshold(gray, 170, 255, cv2.THRESH_BINARY_INV)
-    th = cv2.morphologyEx(th, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
-    cnts, _ = cv2.findContours(th, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    for c in cnts:
-        a = cv2.contourArea(c)
-        if a < circle_area[0] or a > circle_area[1]:
-            continue
-        per = cv2.arcLength(c, True)
-        if per <= 0 or 4 * np.pi * a / (per * per) < 0.8:
-            continue
-        x, y, w, h = cv2.boundingRect(c)
-        if min(w, h) / max(1, max(w, h)) < 0.6:
-            continue
-        cx, cy = x + w // 2, y + h // 2
-        if reach[max(0, cy - args.touch_r):cy + args.touch_r, max(0, cx - args.touch_r):cx + args.touch_r].sum() > 0:
-            symbols.append({"x": int(cx), "y": int(cy), "sym": "circle"})
+# 圆 (三极管) + IC, 触点绿线路径者
+    # 用 HoughCircles (轮廓圆度被走线破坏, 改用 Hough)
+    circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, dp=1.2, minDist=15,
+                               param1=80, param2=30, minRadius=10, maxRadius=35)
+    if circles is not None:
+        for x, y, r in np.rint(circles[0]).astype(int):
+            cx, cy = int(x), int(y)
+            if reach[max(0, cy - args.touch_r):cy + args.touch_r,
+                     max(0, cx - args.touch_r):cx + args.touch_r].sum() > 0:
+                # 去重: 与已有 circle 符号太近则跳过
+                if not any(abs(s["x"] - cx) < 15 and abs(s["y"] - cy) < 15
+                           and s["sym"] == "circle" for s in symbols):
+                    symbols.append({"x": cx, "y": cy, "sym": "circle"})
     _, th2 = cv2.threshold(gray, 160, 255, cv2.THRESH_BINARY_INV)
     th2 = cv2.morphologyEx(th2, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
     cnts2, _ = cv2.findContours(th2, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
