@@ -24,6 +24,8 @@ def main():
     ap.add_argument("--img", required=True)
     ap.add_argument("--refdes", help="OCR refdes 位置 JSON (可选; 无则局部 OCR)")
     ap.add_argument("--db", required=True, help="sch_components.json (读写)")
+    ap.add_argument("--assoc-dist", type=int, default=120, help="标号→符号关联最大距离")
+    ap.add_argument("--type-bonus", type=int, default=40, help="类型匹配加分")
     args = ap.parse_args()
 
     from rapidocr_onnxruntime import RapidOCR
@@ -56,9 +58,9 @@ def main():
         for rd, (rx, ry) in refs.items():
             prefix = "".join(ch for ch in rd if ch.isalpha()).upper()
             d = abs(sx - rx) + abs(sy - ry)
-            if d > 120:
+            if d > args.assoc_dist:
                 continue
-            score = d - (40 if PREFIX.get(prefix) == s["sym"] else 0)
+            score = d - (args.type_bonus if PREFIX.get(prefix) == s["sym"] else 0)
             if best is None or score < best[0]:
                 best = (score, d, rd)
         if best is not None:

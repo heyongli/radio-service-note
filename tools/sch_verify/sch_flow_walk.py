@@ -36,13 +36,14 @@ def color_mask(img, color, g_th=120, r_th=110, b_th=110):
     raise ValueError(color)
 
 
-def verify(components, green, band=14):
+def verify(components, green, band=14, touch_r=25, side=(30, 70)):
     """给每个组件加 membership (绿线鉴别)."""
     H, W = green.shape
+    sd0, sd1 = side
     out = []
     for c in components:
         sx, sy = c["symbol_pos"]
-        touch = green[max(0, sy - 25):sy + 25, max(0, sx - 25):sx + 25].sum() > 0
+        touch = green[max(0, sy - touch_r):sy + touch_r, max(0, sx - touch_r):sx + touch_r].sum() > 0
         sides = []
         if not touch:
             c["membership"] = "none"
@@ -50,10 +51,10 @@ def verify(components, green, band=14):
             c["green_touch"] = False
             out.append(c)
             continue
-        e = green[max(0, sy - band):sy + band, min(sx + 30, W - 1):min(sx + 70, W - 1)].sum() > 0
-        w = green[max(0, sy - band):sy + band, max(0, sx - 70):max(0, sx - 30)].sum() > 0
-        n = green[max(0, sy - 70):max(0, sy - 30), max(0, sx - band):sx + band].sum() > 0
-        s = green[min(sy + 30, H - 1):min(sy + 70, H - 1), max(0, sx - band):sx + band].sum() > 0
+        e = green[max(0, sy - band):sy + band, min(sx + sd0, W - 1):min(sx + sd1, W - 1)].sum() > 0
+        w = green[max(0, sy - band):sy + band, max(0, sx - sd1):max(0, sx - sd0)].sum() > 0
+        n = green[max(0, sy - sd1):max(0, sy - sd0), max(0, sx - band):sx + band].sum() > 0
+        s = green[min(sy + sd0, H - 1):min(sy + sd1, H - 1), max(0, sx - band):sx + band].sum() > 0
         if e: sides.append("E")
         if w: sides.append("W")
         if n: sides.append("N")
@@ -78,6 +79,9 @@ def main():
     ap.add_argument("--db", required=True, help="sch_components.json (读+写 membership)")
     ap.add_argument("--chain", help="输出 chain_order JSON (flow_through 有序链, 供结合管线)")
     ap.add_argument("--seed", help="起点 x,y (可选, 用于 walk_d 排序)")
+    ap.add_argument("--band", type=int, default=22, help="绿线侧边探测带宽 (px; 实测 22 最优)")
+    ap.add_argument("--touch-r", type=int, default=25, help="符号触点绿线判定半径")
+    ap.add_argument("--side-dist", type=str, default="20,50", help="侧边绿线探测距离范围 (px; 实测 20,50 最优)")
     args = ap.parse_args()
 
     img = cv2.imread(args.img)
@@ -87,7 +91,8 @@ def main():
     print(f"[sch_flow_walk] {args.color} mask: {(mask > 0).sum()} px")
 
     db = json.load(open(args.db))
-    db["components"] = verify(db["components"], mask)
+    db["components"] = verify(db["components"], mask, args.band, args.touch_r,
+                                  tuple(int(v) for v in args.side_dist.split(",")))
     db["_meta"]["verify"] = f"{args.color} flow membership"
     with open(args.db, "w") as f:
         json.dump(db, f, indent=2, ensure_ascii=False)

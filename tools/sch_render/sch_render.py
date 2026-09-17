@@ -63,8 +63,45 @@ def main():
             cv2.putText(overlay, str(c.get("refdes", "")), (tp[0] - 20, tp[1] - 25),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
         cv2.circle(overlay, (sx, sy), 6, (0, 0, 255), -1)
+
+    # 图例: 按图比例缩放, 放在空白区 (低墨量象限)
+    H, W = img.shape[:2]
+    gray_g = cv2.cvtColor(overlay, cv2.COLOR_BGR2GRAY)
+    ink = gray_g < 200
+    # 找空白象限: 四象限中暗像素最少者
+    quad = [(0, 0, W//2, H//2), (W//2, 0, W, H//2), (0, H//2, W//2, H), (W//2, H//2, W, H)]
+    best_q = min(quad, key=lambda q: ink[q[1]:q[3], q[0]:q[2]].sum())
+    lx0, ly0, lx1, ly1 = best_q
+    lw_px = int(W / 5100.0)      # 比例系数 (5100 宽基准)
+    lw_px = max(1, lw_px)
+    box_w = int(560 * lw_px)
+    item_h = int(48 * lw_px)
+    fs_title = 1.1 * lw_px
+    fs_item = 0.85 * lw_px
+    ly = ly0 + 30 * lw_px
+    cv2.rectangle(overlay, (lx0 + 20, ly0 + 20), (lx0 + 20 + box_w, ly0 + 30 + 6 * item_h + 10),
+                  (255, 255, 255), -1)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    cv2.putText(overlay, "Legend", (lx0 + 30, ly), font, fs_title, (0, 0, 0), 3 * lw_px)
+    items = [("RX flow line", (0, 255, 0), "line"),
+             ("flow_through (main path)", (0, 255, 255), "circle"),
+             ("branch (side path)", (255, 0, 0), "circle"),
+             ("none (not on flow)", (128, 128, 128), "circle"),
+             ("symbol center", (0, 0, 255), "dot"),
+             ("label->symbol link", (0, 0, 255), "line")]
+    cx0 = lx0 + 50 * lw_px
+    for label, color, kind in items:
+        ly += item_h
+        if kind == "circle":
+            cv2.circle(overlay, (cx0, ly), int(16 * lw_px), color, int(4 * lw_px))
+        elif kind == "dot":
+            cv2.circle(overlay, (cx0, ly), int(8 * lw_px), color, -1)
+        else:
+            cv2.line(overlay, (lx0 + 40 * lw_px, ly), (lx0 + 100 * lw_px, ly), color, int(5 * lw_px))
+        cv2.putText(overlay, label, (lx0 + 115 * lw_px, ly + 8 * lw_px), font, fs_item,
+                    (0, 0, 0), 3 * lw_px)
     cv2.imwrite(args.out, overlay)
-    print(f"[sch_render] saved: {args.out}")
+    print(f"[sch_render] saved: {args.out} (legend at quadrant {best_q[0]},{best_q[1]})")
 
 
 if __name__ == "__main__":

@@ -25,6 +25,17 @@ sch_recognize(识别) → sch_flow_walk(鉴别) → sch_render(渲染)
 - **主路 = 绿线两侧共线通过** (入+出); 支路只有单侧
 - 绿线经过电容基本连续 (只变细), 无完整断口 → 靠符号触点 + 侧边判定
 
+## 有效参数 (实测, 沉淀为知识)
+| 参数 | 默认 | 实测结论 |
+|---|---|---|
+| `--band` | 22 | 绿线侧边探测带宽; **22 最优** (recall 24/31), 14→17/31 |
+| `--side-dist` | 20,50 | 侧边绿线探测距离; **20,50 最优** (近侧边), 30,70→21/31 |
+| `--touch-r` | 25 | 符号触点绿线半径 |
+| `--seed` | - | 给则 chain_order 按 BFS 走线排序 |
+
+**扫描结论**: band 越大 recall 越高 (但误检增多), side 越近越好。
+ground truth: 31 组件 (gt_rx_flow.json), 最佳组合 band=22/side=20,50 → 24/31。
+
 ## 用法
 ```bash
 python3 tools/sch_flow_walk/sch_flow_walk.py \

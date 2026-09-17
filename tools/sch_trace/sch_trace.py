@@ -134,7 +134,18 @@ def main():
     ap.add_argument("--color", default="green", choices=["green", "red", "cyan", "yellow"])
     ap.add_argument("--seed", required=True, help="起点 x,y")
     ap.add_argument("--db", required=True, help="sch_components.json 输出 (symbols 候选)")
+    # 可调参数 (有效值沉淀为知识, best_practices)
+    ap.add_argument("--cap-gap", type=str, default="8,40", help="电容极间距范围 (px)")
+    ap.add_argument("--plate-len", type=str, default="15,90", help="电容板长范围 (px)")
+    ap.add_argument("--circle-area", type=str, default="600,60000", help="三极管圆面积范围")
+    ap.add_argument("--ic-area", type=str, default="4000,250000", help="IC 矩形面积范围")
+    ap.add_argument("--touch-r", type=int, default=30, help="符号触点绿线判定半径")
     args = ap.parse_args()
+
+    cap_gap = tuple(int(v) for v in args.cap_gap.split(","))
+    plate_len = tuple(int(v) for v in args.plate_len.split(","))
+    circle_area = tuple(int(v) for v in args.circle_area.split(","))
+    ic_area = tuple(int(v) for v in args.ic_area.split(","))
 
     img = cv2.imread(args.img)
     if img is None:
@@ -147,10 +158,10 @@ def main():
     print(f"[sch_trace] green flow: {reach.sum()} px (seed {sx},{sy})")
 
     # 只沿绿线路径 (BFS 距离场) 局部探测符号
-    caps = detect_caps(gray)
+    caps = detect_caps(gray, cap_gap, plate_len)
     symbols = []
     for c in caps:
-        if reach[max(0, c["y"] - 30):c["y"] + 30, max(0, c["x"] - 30):c["x"] + 30].sum() > 0:
+        if reach[max(0, c["y"] - args.touch_r):c["y"] + args.touch_r, max(0, c["x"] - args.touch_r):c["x"] + args.touch_r].sum() > 0:
             symbols.append({"x": int(c["x"]), "y": int(c["y"]), "w": int(c["w"]),
                             "h": int(c["h"]), "sym": "cap"})
     # 圆 (三极管) + IC, 触点绿线路径者
@@ -159,7 +170,7 @@ def main():
     cnts, _ = cv2.findContours(th, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     for c in cnts:
         a = cv2.contourArea(c)
-        if a < 600 or a > 60000:
+        if a < circle_area[0] or a > circle_area[1]:
             continue
         per = cv2.arcLength(c, True)
         if per <= 0 or 4 * np.pi * a / (per * per) < 0.8:
@@ -168,14 +179,14 @@ def main():
         if min(w, h) / max(1, max(w, h)) < 0.6:
             continue
         cx, cy = x + w // 2, y + h // 2
-        if reach[max(0, cy - 25):cy + 25, max(0, cx - 25):cx + 25].sum() > 0:
+        if reach[max(0, cy - args.touch_r):cy + args.touch_r, max(0, cx - args.touch_r):cx + args.touch_r].sum() > 0:
             symbols.append({"x": int(cx), "y": int(cy), "sym": "circle"})
     _, th2 = cv2.threshold(gray, 160, 255, cv2.THRESH_BINARY_INV)
     th2 = cv2.morphologyEx(th2, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
     cnts2, _ = cv2.findContours(th2, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     for c in cnts2:
         a = cv2.contourArea(c)
-        if a < 4000 or a > 250000:
+        if a < ic_area[0] or a > ic_area[1]:
             continue
         x, y, w, h = cv2.boundingRect(c)
         if not (60 <= max(w, h) <= 500):
@@ -183,7 +194,7 @@ def main():
         per = cv2.arcLength(c, True)
         if per and len(cv2.approxPolyDP(c, 0.04 * per, True)) == 4 and a / (w * h) > 0.55:
             cx, cy = x + w // 2, y + h // 2
-            if reach[max(0, cy - 60):cy + 60, max(0, cx - 60):cx + 60].sum() > 0:
+            if reach[max(0, cy - args.touch_r):cy + args.touch_r, max(0, cx - args.touch_r):cx + args.touch_r].sum() > 0:
                 symbols.append({"x": int(cx), "y": int(cy), "sym": "ic"})
 
     db = {"_meta": {"purpose": "sch components (trace: green-flow symbols)",
