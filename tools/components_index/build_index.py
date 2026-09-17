@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""tools/components_index/build_index.py — 索引构建工具
+purpose: 从 OCR raw_stage1/raw_stage2 聚合 refdes → components_index
+format: Python 3
+version: 0.2.0 (2026-09-15)
+consumers: 索引初始化/增量更新"""
+
 """元器件索引构建 — 原理图↔PCB 跨图映射的枢纽.
 
 把 原理图位号坐标 / PCB锚点(网表) / AI-OCR运行命中 三方数据按 ref-des
