@@ -267,11 +267,6 @@ def main():
             n_ok += 1
         else:
             bad[c["refdes"]] = detail
-    tmp = args.db + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(db, f, indent=2, ensure_ascii=False)
-    import os
-    os.replace(tmp, args.db)
     print(f"[sch_symbol_verify] flow_through boundary: ok={n_ok}/{n} (corrected {corrected})")
     for rd, d in sorted(bad.items()):
         print(f"  BAD {rd:6s} {d}")
@@ -315,6 +310,13 @@ def main():
     print(f"[sch_symbol_verify] refdes dedup: dropped {dedup_dropped} duplicate entries")
     n_ft = sum(1 for c in db["components"] if c["membership"] == "flow_through")
     print(f"[sch_symbol_verify] flow_through after dedup: {n_ft}")
+
+    # 写盘 (在 dedup 之后, 确保去重结果保存)
+    tmp = args.db + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(db, f, indent=2, ensure_ascii=False)
+    import os
+    os.replace(tmp, args.db)
 
 
 if __name__ == "__main__":
