@@ -43,18 +43,32 @@ def main():
     ap.add_argument("--seed", default="626,1480")
     ap.add_argument("--refdes", default=str(ROOT / "/tmp/opencode/sch_refdes_600.json"))
     ap.add_argument("--db", default="/tmp/opencode/sch_components.json")
+    # 可搜索参数 (量化值全部可调)
+    ap.add_argument("--assoc-dist", type=int, default=220, help="标号→符号关联距离")
+    ap.add_argument("--type-bonus", type=int, default=40)
+    ap.add_argument("--band", type=int, default=22, help="绿线侧边带宽")
+    ap.add_argument("--side-dist", default="20,50", help="侧边探测距离")
+    ap.add_argument("--verify-rots", default="0", help="验证旋转集")
+    ap.add_argument("--trace-extra", default="", help="额外传给 sch_trace 的参数 (如 --circle-rmax 40)")
     args = ap.parse_args()
 
     rn = args.round
     annot = ROOT / "projects/icom2200h/annot"
 
     print(f"=== Round {rn}: sch 管线 ===")
-    run([sys.executable, "tools/sch_trace/sch_trace.py", "--img", IMG,
-         "--color", "green", "--seed", args.seed, "--db", args.db])
+    trace_cmd = [sys.executable, "tools/sch_trace/sch_trace.py", "--img", IMG,
+                 "--color", "green", "--seed", args.seed, "--db", args.db]
+    # 可传搜索参数
+    if args.trace_extra:
+        trace_cmd += args.trace_extra.split()
+    run(trace_cmd)
     run([sys.executable, "tools/sch_label_ocr/sch_label_ocr.py", "--img", IMG,
-         "--refdes", args.refdes, "--db", args.db])
+         "--refdes", args.refdes, "--db", args.db,
+         "--assoc-dist", str(args.assoc_dist), "--type-bonus", str(args.type_bonus)])
     run([sys.executable, "tools/sch_verify/sch_flow_walk.py", "--img", IMG,
-         "--color", "green", "--db", args.db, "--chain", CHAIN, "--seed", args.seed])
+         "--color", "green", "--db", args.db, "--chain", CHAIN, "--seed", args.seed,
+         "--band", str(args.band), "--side-dist", args.side_dist,
+         "--verify-rots", args.verify_rots])
 
     print(f"\n=== Round {rn}: sch 渲染 ===")
     run([sys.executable, "tools/sch_render/sch_render.py", "--img", IMG,

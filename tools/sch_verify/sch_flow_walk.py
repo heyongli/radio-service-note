@@ -98,7 +98,7 @@ def _ocr_reads_ref(gray, ocr, x, y, refdes, radius=50, rots=(0,)):
     return False, None
 
 
-def reverse_ocr_verify(gray, ocr, components, sym_list=None, radius=50, correct=True):
+def reverse_ocr_verify(gray, ocr, components, sym_list=None, radius=50, correct=True, rots=(0,)):
     """反向 OCR 验证符号中心 (只验 flow_through), 报告准确率.
 
     correct=True 时纠正: 符号中心读不出 refdes 的, 在文字附近找
@@ -109,7 +109,7 @@ def reverse_ocr_verify(gray, ocr, components, sym_list=None, radius=50, correct=
         if c.get("membership") != "flow_through" or not c.get("refdes"):
             continue
         sx, sy = c["symbol_pos"]
-        ok, rot = _ocr_reads_ref(gray, ocr, sx, sy, c["refdes"], radius)
+        ok, rot = _ocr_reads_ref(gray, ocr, sx, sy, c["refdes"], radius, rots)
         n_total += 1
         c["sym_verify"] = "ok" if ok else "wrong"
         if ok:
@@ -121,7 +121,7 @@ def reverse_ocr_verify(gray, ocr, components, sym_list=None, radius=50, correct=
         tx, ty = c.get("text_pos") or (sx, sy)
         near = sorted(sym_list, key=lambda s: abs(s["x"] - tx) + abs(s["y"] - ty))[:8]
         for s in near:
-            ok2, _ = _ocr_reads_ref(gray, ocr, s["x"], s["y"], c["refdes"], radius)
+            ok2, _ = _ocr_reads_ref(gray, ocr, s["x"], s["y"], c["refdes"], radius, rots)
             if ok2:
                 c["symbol_pos"] = [s["x"], s["y"]]
                 c["sym_verify"] = "corrected"
@@ -160,6 +160,8 @@ def main():
     ap.add_argument("--touch-r", type=int, default=25, help="符号触点绿线判定半径")
     ap.add_argument("--side-dist", type=str, default="20,50", help="侧边绿线探测距离范围 (px; 实测 20,50 最优)")
     ap.add_argument("--no-verify", action="store_true", help="跳过反向 OCR 验证 (加速)")
+    ap.add_argument("--verify-radius", type=int, default=50, help="反向 OCR 验证裁剪半径")
+    ap.add_argument("--verify-rots", type=str, default="0", help="验证旋转集 (逗号分隔, 如 0,90,180,270)")
     args = ap.parse_args()
 
     img = cv2.imread(args.img)
@@ -178,12 +180,12 @@ def main():
         ocr = RapidOCR()
         syms = db.get("symbols", [])
         # 1) 验证+纠正符号中心
-        reverse_ocr_verify(gray, ocr, db["components"], syms, correct=True)
+        reverse_ocr_verify(gray, ocr, db["components"], syms, correct=True, radius=args.verify_radius, rots=tuple(int(v) for v in args.verify_rots.split(",")))
         # 2) 纠正后重新跑 membership (纠正的位置可能触点绿线)
         db["components"] = verify(db["components"], mask, args.band, args.touch_r,
                                   tuple(int(v) for v in args.side_dist.split(",")))
         # 3) 重新验证
-        reverse_ocr_verify(gray, ocr, db["components"], syms, correct=False)
+        reverse_ocr_verify(gray, ocr, db["components"], syms, correct=False, radius=args.verify_radius, rots=tuple(int(v) for v in args.verify_rots.split(",")))
     with open(args.db, "w") as f:
         json.dump(db, f, indent=2, ensure_ascii=False)
 

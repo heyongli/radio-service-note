@@ -140,7 +140,10 @@ def main():
     ap.add_argument("--circle-area", type=str, default="600,60000", help="三极管圆面积范围")
     ap.add_argument("--ic-area", type=str, default="4000,250000", help="IC 矩形面积范围")
     ap.add_argument("--touch-r", type=int, default=30, help="符号触点绿线判定半径")
-    ap.add_argument("--circle-circ", type=float, default=0.7, help="三极管圆度阈值")
+    ap.add_argument("--circle-circ", type=float, default=0.7, help="三极管圆度阈值 (轮廓法)")
+    ap.add_argument("--circle-rmin", type=int, default=10, help="HoughCircles 圆最小半径")
+    ap.add_argument("--circle-rmax", type=int, default=35, help="HoughCircles 圆最大半径")
+    ap.add_argument("--hough-param2", type=int, default=30, help="HoughCircles param2 (圆检测灵敏度)")
     args = ap.parse_args()
 
     cap_gap = tuple(int(v) for v in args.cap_gap.split(","))
@@ -168,7 +171,7 @@ def main():
 # 圆 (三极管) + IC, 触点绿线路径者
     # 用 HoughCircles (轮廓圆度被走线破坏, 改用 Hough)
     circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, dp=1.2, minDist=15,
-                               param1=80, param2=30, minRadius=10, maxRadius=35)
+                               param1=80, param2=args.hough_param2, minRadius=args.circle_rmin, maxRadius=args.circle_rmax)
     if circles is not None:
         for x, y, r in np.rint(circles[0]).astype(int):
             cx, cy = int(x), int(y)
