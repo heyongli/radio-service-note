@@ -74,7 +74,7 @@ def _hough_circles(gray, x, y, radius=80, rmin=10, rmax=40):
     out = []
     if cs is not None:
         for cx, cy, r in np.rint(cs[0]).astype(int):
-            out.append({"cx": cx + x - radius, "cy": cy + y - radius, "r": int(r)})
+            out.append({"cx": int(cx) + x - radius, "cy": int(cy) + y - radius, "r": int(r)})
     return out
 
 
@@ -89,11 +89,11 @@ def correct_to_boundary(gray, c, radius=120):
             if best is None or d < best[0]:
                 best = (d, [h["cx"], h["cy"]])
         if best:
-            return best[1]
+            return [int(best[1][0]), int(best[1][1])]
         cnts = _dark_contours(gray, tx, ty, radius, th=150)
         for cc in cnts:
             if cc["circ"] > 0.6 and cc["w"] >= 14 and cc["h"] >= 14:
-                return [cc["x"] + cc["w"] // 2, cc["y"] + cc["h"] // 2]
+                return [int(cc["x"] + cc["w"] // 2), int(cc["y"] + cc["h"] // 2)]
         return None
     if sym == "ic":
         cnts = _dark_contours(gray, tx, ty, radius, th=150)
@@ -102,13 +102,13 @@ def correct_to_boundary(gray, c, radius=120):
             if cc["w"] >= 30 and cc["h"] >= 25:
                 d = abs(cc["x"] + cc["w"] / 2 - tx) + abs(cc["y"] + cc["h"] / 2 - ty)
                 if best is None or d < best[0]:
-                    best = (d, [cc["x"] + cc["w"] // 2, cc["y"] + cc["h"] // 2])
+                    best = (d, [int(cc["x"] + cc["w"] // 2), int(cc["y"] + cc["h"] // 2)])
         return best[1] if best else None
     # 电阻/电感: 在 label 附近找长暗线段 (连续线)
     cnts = _dark_contours(gray, tx, ty, radius, th=150)
     for cc in sorted(cnts, key=lambda x: -x["w"] * x["h"]):
         if cc["w"] >= 40 or cc["h"] >= 40:
-            return [cc["x"] + cc["w"] // 2, cc["y"] + cc["h"] // 2]
+            return [int(cc["x"] + cc["w"] // 2), int(cc["y"] + cc["h"] // 2)]
     return None
 
 
@@ -190,6 +190,49 @@ def verify_symbol(gray, c, radius=80, correct=True):
     return False, "no_line", None
 
 
+def boundary_from_symbol(gray, c, radius=80):
+    """检测并返回 flow_through 组件的符号边界 (存 sch_components.json)."""
+    sx, sy = c["symbol_pos"]
+    sym = type_from_refdes(c.get("refdes", ""))
+    if sym == "circle":
+        best = None
+        for h in _hough_circles(gray, sx, sy, radius):
+            if (sx - h["cx"]) ** 2 + (sy - h["cy"]) ** 2 <= (h["r"] + 4) ** 2:
+                d = abs(h["cx"] - sx) + abs(h["cy"] - sy)
+                if best is None or d < best[0]:
+                    best = (d, {"kind": "circle", "cx": int(h["cx"]), "cy": int(h["cy"]), "r": int(h["r"])})
+        if best:
+            return best[1]
+    elif sym == "ic":
+        cnts = _dark_contours(gray, sx, sy, radius)
+        for cc in cnts:
+            if cc["w"] >= 30 and cc["h"] >= 25:
+                if cc["x"] - 4 <= sx <= cc["x"] + cc["w"] + 4 and \
+                   cc["y"] - 4 <= sy <= cc["y"] + cc["h"] + 4:
+                    return {"kind": "rect", "x": int(cc["x"]), "y": int(cc["y"]),
+                            "w": int(cc["w"]), "h": int(cc["h"])}
+    return None
+
+
+def _bounds_overlap(b1, b2, pad=6):
+    """两符号边界是否重叠 (电路图符号不能重叠 → 重叠即识别错误)."""
+    if b1 is None or b2 is None:
+        return False
+    if b1["kind"] == "circle" and b2["kind"] == "circle":
+        return (b1["cx"] - b2["cx"]) ** 2 + (b1["cy"] - b2["cy"]) ** 2 <= \
+               (b1["r"] + b2["r"] + pad) ** 2
+    if b1["kind"] == "rect" and b2["kind"] == "rect":
+        return not (b1["x"] + b1["w"] + pad < b2["x"] or b2["x"] + b2["w"] + pad < b1["x"] or
+                    b1["y"] + b1["h"] + pad < b2["y"] or b2["y"] + b2["h"] + pad < b1["y"])
+    # 圆-方块
+    c = b1 if b1["kind"] == "circle" else b2
+    r = b2 if b1["kind"] == "circle" else b1
+    cx, cy, rr = c["cx"], c["cy"], c["r"]
+    nx = max(r["x"] - pad, min(cx, r["x"] + r["w"] + pad))
+    ny = max(r["y"] - pad, min(cy, r["y"] + r["h"] + pad))
+    return (cx - nx) ** 2 + (cy - ny) ** 2 <= (rr + pad) ** 2
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--img", required=True)
@@ -215,19 +258,63 @@ def main():
         c["sym_verify"] = "ok" if ok else "bad"
         c["sym_verify_detail"] = detail
         if np2:
-            # 反馈: 纠正符号位置 (反向推理: 用黑边边界锚定真实符号)
             c["symbol_pos"] = np2
             c["sym_corrected"] = True
             corrected += 1
+        # 存储符号边界 (用于重叠检测 + 渲染)
+        c["sym_boundary"] = boundary_from_symbol(gray, c, args.radius)
         if ok:
             n_ok += 1
         else:
             bad[c["refdes"]] = detail
-    with open(args.db, "w") as f:
+    tmp = args.db + ".tmp"
+    with open(tmp, "w") as f:
         json.dump(db, f, indent=2, ensure_ascii=False)
+    import os
+    os.replace(tmp, args.db)
     print(f"[sch_symbol_verify] flow_through boundary: ok={n_ok}/{n} (corrected {corrected})")
     for rd, d in sorted(bad.items()):
         print(f"  BAD {rd:6s} {d}")
+
+    # 符号重叠检测: 电路图符号不能重叠, 重叠即识别错误
+    ft = [c for c in db["components"]
+          if c.get("membership") == "flow_through" and c.get("refdes") and c.get("sym_boundary")]
+    overlap_pairs = []
+    for i in range(len(ft)):
+        for j in range(i + 1, len(ft)):
+            if _bounds_overlap(ft[i]["sym_boundary"], ft[j]["sym_boundary"]):
+                overlap_pairs.append((ft[i]["refdes"], ft[j]["refdes"]))
+    print(f"[sch_symbol_verify] overlapping symbol boundaries: {len(overlap_pairs)}")
+    for a, b in overlap_pairs[:20]:
+        print(f"  OVERLAP {a} <-> {b}")
+
+    # refdes 去重: 符号不能重叠 → 同 refdes 保留一个 (边界验证 OK + 触点绿线最近)
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for c in db["components"]:
+        if c.get("membership") == "flow_through" and c.get("refdes"):
+            groups[c["refdes"]].append(c)
+    dedup_dropped = 0
+    for rd, lst in groups.items():
+        if len(lst) <= 1:
+            continue
+        best = None
+        for c in lst:
+            score = 0
+            if c.get("sym_verify") == "ok":
+                score -= 100
+            if c.get("sym_boundary"):
+                score -= 50
+            score += c.get("sym_d", 0) or 0
+            if best is None or score < best[0]:
+                best = (score, c)
+        for c in lst:
+            if c is not best[1]:
+                c["membership"] = "dup_drop"
+                dedup_dropped += 1
+    print(f"[sch_symbol_verify] refdes dedup: dropped {dedup_dropped} duplicate entries")
+    n_ft = sum(1 for c in db["components"] if c["membership"] == "flow_through")
+    print(f"[sch_symbol_verify] flow_through after dedup: {n_ft}")
 
 
 if __name__ == "__main__":

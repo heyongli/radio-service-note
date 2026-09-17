@@ -84,8 +84,8 @@ def main():
             if bd.get("kind") == "circle":
                 cv2.circle(overlay, (bd["cx"], bd["cy"]), bd["r"], (0, 255, 255), 2)
             elif bd.get("kind") == "rect":
-                cv2.rectangle(overlay, (bd["cx"], bd["cy"]),
-                              (bd["cx"] + bd["w"], bd["cy"] + bd["h"]), (0, 255, 255), 2)
+                cv2.rectangle(overlay, (bd["x"], bd["y"]),
+                              (bd["x"] + bd["w"], bd["y"] + bd["h"]), (0, 255, 255), 2)
         # label 文字框
         tbox = c.get("text_box")
         if tbox and len(tbox) == 4:
