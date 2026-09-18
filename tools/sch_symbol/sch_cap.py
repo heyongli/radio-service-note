@@ -17,11 +17,13 @@ from common import (find_cap_pairs_proj, find_cap_pairs, find_lines,
 
 def cap_quality(gray, green, cx, cy, gap, length, dir, x, y,
                 gap_empty_th=140, gap_empty_frac=0.15, wire_px=2, wire_pen=60,
-                touch_pen=40, touch_r=15, gap_pen=120):
+                touch_pen=40, touch_r=15, gap_pen=120, pb=None):
     """电容候选质量分 (越低越好): 距离 + 板间空 + 两侧接线 + 绿线触点.
 
     约束 (best_practices §5b-3):
       - 两板间必须为空 (板线内侧之间暗占比 < gap_empty_frac)
+        **板间空在 pb (去绿线) 上检查** —— 绿线经过电容基本连续, 板间有绿线
+        是正常的, 不能算"非空"
       - 两侧必有接线 (板线外缘延伸有走线)
       - 绿线经过电容基本连续 → 中心附近触点绿线
     返回 score (penalty 累积). 板间空为**软惩罚** (gap_pen) 而非硬拒,
@@ -31,22 +33,23 @@ def cap_quality(gray, green, cx, cy, gap, length, dir, x, y,
     H, W = gray.shape
     gap = max(4, gap)
     length = max(4, length)
+    src = pb if pb is not None else gray  # 板间空用去绿线图层
     # 板线内侧带 (避开板线本身): 取 gap 中央 50% 区域
     in_gap = max(2, gap // 2)  # 中心带宽 (半gap)
     # 板线外侧窗口 (接线探测)
     out_w = max(6, gap // 2)
     if dir == "h":
         # 走线水平, 板线垂直, gap 水平, len 垂直
-        band = gray[max(0, cy - length // 2):cy + length // 2,
-                    cx - in_gap // 2:cx + in_gap // 2]
+        band = src[max(0, cy - length // 2):cy + length // 2,
+                   cx - in_gap // 2:cx + in_gap // 2]
         left = gray[max(0, cy - length // 2):cy + length // 2,
                     max(0, cx - gap // 2 - out_w):max(0, cx - gap // 2)]
         right = gray[max(0, cy - length // 2):cy + length // 2,
                      cx + gap // 2:min(W, cx + gap // 2 + out_w)]
     else:  # dir == "v"
         # 走线垂直, 板线水平, gap 垂直, len 水平
-        band = gray[cy - in_gap // 2:cy + in_gap // 2,
-                    max(0, cx - length // 2):cx + length // 2]
+        band = src[cy - in_gap // 2:cy + in_gap // 2,
+                   max(0, cx - length // 2):cx + length // 2]
         left = gray[max(0, cy - gap // 2 - out_w):max(0, cy - gap // 2),
                     max(0, cx - length // 2):cx + length // 2]
         right = gray[cy + gap // 2:min(H, cy + gap // 2 + out_w),
@@ -56,7 +59,7 @@ def cap_quality(gray, green, cx, cy, gap, length, dir, x, y,
         return score + gap_pen * 2
     band_dark = (band < gap_empty_th).mean()
     if band_dark > gap_empty_frac:
-        score += gap_pen  # 软惩罚: 板间非空 (小板线/绿线干扰)
+        score += gap_pen  # 软惩罚: 板间非空 (pb 里仍有暗 = 真走线)
     # 两侧接线: 板线外缘附近应有暗色走线 (弱加分)
     lw = (left < gap_empty_th).sum() if left.size else 0
     rw = (right < gap_empty_th).sum() if right.size else 0
@@ -125,25 +128,29 @@ def detect_robust(gray, pb, green, x, y, radius=100, sizes=None,
         return False
 
     cands = []
-    # 源 A: plates (先按距离粗筛, 只算最近的 top_n)
+    # 源 A: plates (主源, 真板线检测; 先按距离粗筛)
     for p in sorted(plates, key=lambda p: abs(p["cx"] - x) + abs(p["cy"] - y))[:top_n]:
         if _exclude(p["cx"], p["cy"]):
             continue
         s = cap_quality(gray, green, int(p["cx"]), int(p["cy"]), int(p["gap"]),
-                        18, "v", x, y, **quality_kw)
+                        18, p.get("dir", "h"), x, y, pb=pb, **quality_kw)
         voted = 1 + sum(1 for g in gaps
                         if abs(p["cx"] - g["cx"]) + abs(p["cy"] - g["cy"]) <= vote_tol)
         cands.append({"cx": int(p["cx"]), "cy": int(p["cy"]), "gap": int(p["gap"]),
-                      "len": None, "dir": "v",
+                      "len": None, "dir": p.get("dir", "h"),
                       "score": s - voted * vote_bonus, "src": "plates"})
-    # 源 B: proj (补充 plates 未覆盖处, 同样粗筛+排除)
+    if cands:
+        best = min(cands, key=lambda c: c["score"])
+        return {"kind": "cap", "cx": best["cx"], "cy": best["cy"],
+                "gap": best["gap"], "len": best.get("len") or 0,
+                "dir": best["dir"], "src": best["src"],
+                "votes": _vote(proj, votes), "score": best["score"]}
+    # 源 B: proj (仅 plates 无候选时兜底)
     for p in sorted(proj, key=lambda p: abs(p["cx"] - x) + abs(p["cy"] - y))[:top_n]:
         if _exclude(p["cx"], p["cy"]):
             continue
-        if any(abs(c["cx"] - p["cx"]) + abs(c["cy"] - p["cy"]) <= 6 for c in cands):
-            continue  # 已被 plates 覆盖
         s = cap_quality(gray, green, p["cx"], p["cy"], p["gap"], p["len"],
-                        p.get("dir", "h"), x, y, **quality_kw)
+                        p.get("dir", "h"), x, y, pb=pb, **quality_kw)
         voted = 1 + sum(1 for vx, vy in votes
                         if abs(p["cx"] - vx) + abs(p["cy"] - vy) <= vote_tol)
         cands.append({"cx": p["cx"], "cy": p["cy"], "gap": p["gap"],
@@ -296,18 +303,22 @@ def detect_plates_on_wire(gray, pb, x, y, radius=100, thick=3):
                 cyi = _plate_center(pb, out[i]["x"], out[i]["y"])
                 cyj = _plate_center(pb, out[j]["x"], out[j]["y"])
                 cy = (cyi + cyj) // 2 if cyi and cyj else out[i]["y"]
+                # 竖板线 → 走线水平 → dir=h (板线垂直=走线水平)
                 caps.append({"cx": (out[i]["x"] + out[j]["x"]) // 2,
-                             "cy": cy, "gap": g})
+                             "cy": cy, "gap": g, "dir": "h"})
     return caps
 
 
-def _plate_center(pb, x, y, span=25, thick=3):
-    """板线 (竖线) 实际暗段中心 y. 在 x 列扫 pb, 找最粗暗段的中点."""
+def _plate_center(pb, x, y, span=40, thick=3, plate_len=(8, 22)):
+    """板线 (竖线) 实际暗段中心 y. 在 x 列扫 pb, 选**板线长度范围**的暗段.
+
+    板线 = 短暗段 (11-12px), 走线 = 长暗段 (18px+). 选 plate_len 内的暗段中心.
+    """
     H = pb.shape[0]
     col = pb[max(0, y - span):min(H, y + span), x]
     if col.size == 0:
         return None
-    best = None
+    cands = []
     s = None
     for i, v in enumerate(col):
         if v:
@@ -316,14 +327,18 @@ def _plate_center(pb, x, y, span=25, thick=3):
         else:
             if s is not None:
                 ln = i - s
-                if ln >= thick and (best is None or ln > best[0]):
-                    best = (ln, (s + i) // 2 + y - span)
+                if plate_len[0] <= ln <= plate_len[1]:
+                    cands.append((ln, (s + i) // 2 + y - span))
                 s = None
     if s is not None:
         ln = len(col) - s
-        if ln >= thick and (best is None or ln > best[0]):
-            best = (ln, (s + len(col)) // 2 + y - span)
-    return best[1] if best else None
+        if plate_len[0] <= ln <= plate_len[1]:
+            cands.append((ln, (s + len(col)) // 2 + y - span))
+    if cands:
+        # 板线是短暗段: 选长度最短的候选 (走线暗段更长)
+        cands.sort(key=lambda t: (t[0], abs(t[1] - y)))
+        return cands[0][1]
+    return None
 
 
 def match_mask(gray, mask, x, y, radius=80):

@@ -1,0 +1,68 @@
+# tools/sch_wire — 原理图走线识别 (无监督 net 网表)
+
+## 文件清单
+| 文件 | 用途 |
+|---|---|
+| `sch_wire.py` | 纯黑图层 → 连接圆点检测 + Zhang-Suen 骨架化 → 走线端点/交叉点 |
+| `sch_wirenet.py` | **无监督 net 网表提取**: 暗像素连通域 = net, 主 net 识别 (真理源) |
+| `readme.md` | 本文档 (修改前必读) |
+
+## 定位
+sch 管线的**走线识别层 (独立发展, 不依赖任何其他)**。走线是最**连续、最简单**
+的完整图形元素, 识别最容易, **无需绿线/标注** (绿线是叠印其上的标注, 非遮挡)。
+供走线↔符号互验 + **元器件→net 网表关联** (best_practices §5b-3)。
+
+```
+sch_trace → sch_label_ocr → sch_flow_walk → sch_symbol → sch_symbol_selfcheck
+  → sch_wire(走线骨架/连接点) → sch_wirenet(net 网表) → 符号↔net 关联 → chain_order
+```
+
+## 核心发现 (2026-09-17 实测)
+- **每个连通域 = 一个 net** (无监督, 无需标注)
+- IC-2200H: **5963 nets**, 主走线网络 = 903588px (**76%** 暗像素), 单一连通域
+- **94% 绿线落在主 net 内** → 确认绿线标注的正是主走线网络
+- 原图直接连通域即得最完整主 net (绿线属于走线), **无需先去绿线**
+- 用途: 主 net 掩膜存为**真理源** (可信度 85, schema §3.5b); 符号必在走线上
+  → 可 de-wire 切除走线; 元器件用**本体位置**关联 net (标号位置在小 net 上)
+
+## 有效参数
+| 参数 | 默认 | 说明 |
+|---|---|---|
+| `sch_wirenet: --dark-th` | 150 | 暗像素阈值 |
+| `--min-area` | 50 | 最小 net 面积 (滤噪声) |
+| `--main-min` | 0.5 | 主 net 占暗像素比例阈值 |
+| `--save-main` | - | 保存主 net 掩膜 PNG (真理源) |
+| `sch_wire: --x, --y, --radius` | 2500,2500,300 | 局部走线区域 |
+
+## 数据格式 (输出 wirenet.json)
+```json
+{
+  "_meta": {"purpose": "sch 走线 net 网表 (无监督连通域)", ...},
+  "total_nets": 1005,
+  "total_dark_px": 1188795,
+  "main_net": {"id": 13, "area": 903588, "ratio": 0.76, "is_main": true,
+               "main_mask": "/tmp/wire_main_net.png"},
+  "nets": [{"id": 13, "area": 903588, "bbox": [527,549,4034,2805]}, ...]
+}
+```
+- `sch_wire.py` 输出: junction_dots (连接圆点) + wire_nodes (骨架端点/交叉)
+
+## 用法
+```bash
+# net 网表 + 主 net 真理源
+python3 tools/sch-true-finding/sch_wirenet.py \
+  --img projects/icom2200h/render/rxtx-sch-600-1.png \
+  --out /tmp/opencode/wirenet.json --save-main /tmp/opencode/wire_main_net.png
+
+# 局部走线骨架/端点
+python3 tools/sch-true-finding/sch_wire.py \
+  --img projects/icom2200h/render/rxtx-sch-600-1.png \
+  --x 2500 --y 2500 --radius 300 --out /tmp/opencode/wires.json
+```
+
+## 目的
+无监督建立走线拓扑 (net 网表 + 骨架 + 连接点), 与符号识别互证:
+- 走线必终结于符号, 符号必有走线 (双向约束)
+- 识别出的元器件可**关联到 net 网表** (符号本体位置落在哪个 net)
+- 主走线网络是**最强真理源** (最连续最简单, 不依赖其他, architecture §14.1c)
+- 连接点决定走线交叉, 是电路拓扑恢复的基础

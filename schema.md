@@ -490,6 +490,7 @@ schematic_flow_walk ──► chain_order_rx.json ──► radio_design_flow (r
 | 已确认符号位置 | `symbol_pos` (selfcheck 后) | sch_symbol_selfcheck | 80 | 后续轮直接使用 + 周边上下文 |
 | 信号流彩线掩膜 | `green_touch`/`green_sides` | sch_flow_walk | 60 | 弱约束: 主路符号应在绿线附近 (排序加权) |
 | 走线/连接点 | sch_wire 输出 | sch_wire | 40 | 弱约束: 符号引出线应对齐走线 |
+| **走线主网络** | `wire_main_net.png` (掩膜) | 暗像素最大连通域 | **85** (实测: 76% 暗像素单一 net) | 强约束: 符号必在走线上; de-wire 切除走线 |
 | 主路链序 | `chain_order_rx.json` | sch_flow_walk | 40 | 弱约束: 上下游约束符号身份/顺序 |
 
 > **wire 真理度待标定 (2026-09-17)**: sch_wire 的走线识别失败率尚未评估

@@ -150,6 +150,10 @@ python3 tools/signal_flow_route/signal_flow_route.py \
   (OCR 文字框/绿线掩膜/符号尺寸/链序/走线) 不断入库, 随处可作真理源反哺识别:
   text_box 硬约束排除 (候选落文字框=标号非符号), 绿线/尺寸弱约束排序加权。
   实现: sch_cap.detect_robust 已接入 `_in_box` 排除 + 绿线触点弱约束。
+- **走线主网络 = 最强真理源 (2026-09-17)**: 走线最连续最简单, 不依赖任何其他。
+  实测暗像素最大连通域 903588px (76%), 单一 net, 94% 绿线落在其上。
+  用途: 主 net 掩膜存为真理源 (`wire_main_net.png`), 可 de-wire 切除走线。
+  工具: `tools/sch-true-finding/` (sch_true_greenline 绿线 / de_greenline 去绿线)。
 
 ### 下一步
 - bot 视图圆形裁切 pcb_label_ocr 全量跑 (已有 --limit 测试)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""tools/sch_wire/sch_wire.py — 原理图走线识别 (独立模块)
+"""tools/sch-true-finding/sch_wire.py — 原理图走线识别 (独立模块)
 
 purpose: 识别原理图黑色走线 (traces) 与连接点 (junction 圆点):
           - 纯黑图层提取走线 (去绿线干扰)
