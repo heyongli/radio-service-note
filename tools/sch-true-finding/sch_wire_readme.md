@@ -45,7 +45,7 @@ sch_trace → sch_label_ocr → sch_flow_walk → sch_symbol → sch_symbol_self
   排除标注本身 → 沿走线方向插值恢复标注下的走线 (标注两侧连接走线)。
 - 用途: 主 net 掩膜存为**真理源** (可信度 85, schema §3.5b); 符号必在走线上
   → 可 de-wire 切除走线; 元器件用**本体位置**关联 net (标号位置在小 net 上)
-- **后期处理**: de-greenline 剔除绿线 (主net∩绿线 19.2%), 走线半宽
+- **后期处理**: de-annotate 剔除彩线 (主net∩绿线 19.2%), 走线半宽
   p90 5.7→2.3 (绿线是主要粗度来源); 元件轮廓分离列为后续任务
 
 ## 有效参数

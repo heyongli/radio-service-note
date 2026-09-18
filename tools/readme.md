@@ -104,7 +104,7 @@ sch_wire/ (走线↔符号互验) → sch_render (渲染) → chain_order_rx.jso
 阶段1 基础 wire 识别 (无依赖)
   sch_wirenet: 暗像素连通域 = net → 主net/断片 → wirenet.json (真理源 85)
 阶段2 用 wire net 辅助识别标注 (互证)
-  de_greenline: 标注 = 高饱和彩色 (--s-min 80 排除低饱和走线)
+  de_annotate: 标注 = 高饱和彩色 (--s-min 80 排除低饱和走线)
   → 去标注, 标注下走线填走线色恢复 (--fill-wire)
 阶段3 高级 wire 识别 (去标注后无污染)
   连通域/骨架/线宽离散化 → 更纯 net → 反哺阶段2 → 循环进化
@@ -113,7 +113,7 @@ sch_wire/ (走线↔符号互验) → sch_render (渲染) → chain_order_rx.jso
 | 阶段 | 工具 | 关键参数 | 产出 |
 |---|---|---|---|
 | 1 粗 net | `sch_wirenet.py` | --dark-th 150 | wirenet.json + 主net掩膜 |
-| 2 去标注 | `de_greenline.py` | --color all --s-min 80 | 去标注图 |
+| 2 去标注 | `de_annotate.py` | --color all --s-min 80 | 去标注图 |
 | 3 精 net | `sch_wirenet.py` (复用) | 输入=阶段2输出 | 纯净 net 网表 |
 
 **互证要点**: 标注高饱和 (s>80)/走线低饱和 (s≤80) → --s-min 防误删;
@@ -177,7 +177,7 @@ python3 tools/signal_flow_route/signal_flow_route.py \
 - **走线主网络 = 最强真理源 (2026-09-17)**: 走线最连续最简单, 不依赖任何其他。
   实测暗像素最大连通域 903588px (76%), 单一 net, 94% 绿线落在其上。
   用途: 主 net 掩膜存为真理源 (`wire_main_net.png`), 可 de-wire 切除走线。
-  工具: `tools/sch-true-finding/` (sch_true_greenline 绿线 / de_greenline 去绿线)。
+  工具: `tools/sch-true-finding/` (sch_true_greenline 绿线 / de_annotate 去标注)。
 
 ### 下一步
 - bot 视图圆形裁切 pcb_label_ocr 全量跑 (已有 --limit 测试)
