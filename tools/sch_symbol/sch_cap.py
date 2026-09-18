@@ -8,9 +8,161 @@
   python3 sch_cap.py --img sch.png --db sch_components.json
 """
 import argparse, sys
+from concurrent.futures import ThreadPoolExecutor
 import cv2
 import numpy as np
-from common import find_cap_pairs, find_lines, load_db, save_db, boundary_from_body
+from common import (find_cap_pairs_proj, find_cap_pairs, find_lines,
+                    load_db, save_db, boundary_from_body)
+
+
+def cap_quality(gray, green, cx, cy, gap, length, dir, x, y,
+                gap_empty_th=140, gap_empty_frac=0.15, wire_px=2, wire_pen=60,
+                touch_pen=40, touch_r=15, gap_pen=120):
+    """电容候选质量分 (越低越好): 距离 + 板间空 + 两侧接线 + 绿线触点.
+
+    约束 (best_practices §5b-3):
+      - 两板间必须为空 (板线内侧之间暗占比 < gap_empty_frac)
+      - 两侧必有接线 (板线外缘延伸有走线)
+      - 绿线经过电容基本连续 → 中心附近触点绿线
+    返回 score (penalty 累积). 板间空为**软惩罚** (gap_pen) 而非硬拒,
+    避免误杀小板线 (parameter_space §调参规律-3).
+    全阈值参数化 (architecture §5.9).
+    """
+    H, W = gray.shape
+    gap = max(4, gap)
+    length = max(4, length)
+    # 板线内侧带 (避开板线本身): 取 gap 中央 50% 区域
+    in_gap = max(2, gap // 2)  # 中心带宽 (半gap)
+    # 板线外侧窗口 (接线探测)
+    out_w = max(6, gap // 2)
+    if dir == "h":
+        # 走线水平, 板线垂直, gap 水平, len 垂直
+        band = gray[max(0, cy - length // 2):cy + length // 2,
+                    cx - in_gap // 2:cx + in_gap // 2]
+        left = gray[max(0, cy - length // 2):cy + length // 2,
+                    max(0, cx - gap // 2 - out_w):max(0, cx - gap // 2)]
+        right = gray[max(0, cy - length // 2):cy + length // 2,
+                     cx + gap // 2:min(W, cx + gap // 2 + out_w)]
+    else:  # dir == "v"
+        # 走线垂直, 板线水平, gap 垂直, len 水平
+        band = gray[cy - in_gap // 2:cy + in_gap // 2,
+                    max(0, cx - length // 2):cx + length // 2]
+        left = gray[max(0, cy - gap // 2 - out_w):max(0, cy - gap // 2),
+                    max(0, cx - length // 2):cx + length // 2]
+        right = gray[cy + gap // 2:min(H, cy + gap // 2 + out_w),
+                     max(0, cx - length // 2):cx + length // 2]
+    score = abs(cx - x) + abs(cy - y)
+    if band.size == 0:
+        return score + gap_pen * 2
+    band_dark = (band < gap_empty_th).mean()
+    if band_dark > gap_empty_frac:
+        score += gap_pen  # 软惩罚: 板间非空 (小板线/绿线干扰)
+    # 两侧接线: 板线外缘附近应有暗色走线 (弱加分)
+    lw = (left < gap_empty_th).sum() if left.size else 0
+    rw = (right < gap_empty_th).sum() if right.size else 0
+    wire_ok = lw >= wire_px and rw >= wire_px
+    # 绿线触点: 中心 ±touch_r 内触点绿线 (在 flow 上)
+    touch = green is not None and (
+        green[max(0, cy - touch_r):cy + touch_r,
+              max(0, cx - touch_r):cx + touch_r].sum() > 0)
+    if not wire_ok:
+        score += wire_pen  # 弱惩罚 (引出线缺失)
+    if not touch:
+        score += touch_pen  # 弱惩罚 (不在绿线上)
+    return score
+
+
+def _vote(candidates, votes, tol=12):
+    """候选中心与投票源一致性: 每个源附近有候选则计数."""
+    for vx, vy in votes:
+        if any(abs(c["cx"] - vx) + abs(c["cy"] - vy) <= tol for c in candidates):
+            return True
+    return False
+
+
+def _in_box(px, py, box, pad=0):
+    """点是否在文字框内 (含 pad). text_box 是 OCR 精确标号框."""
+    if not box or len(box) < 4:
+        return False
+    xs = [p[0] for p in box]
+    ys = [p[1] for p in box]
+    return (min(xs) - pad <= px <= max(xs) + pad and
+            min(ys) - pad <= py <= max(ys) + pad)
+
+
+def detect_robust(gray, pb, green, x, y, radius=100, sizes=None,
+                  vote_tol=12, vote_bonus=15, text_box=None, label_pad=4,
+                  top_n=60, exclude_text=True, exclude_green=False,
+                  **quality_kw):
+    """多源投票电容检测 (冲突排除优先于确认).
+
+    阶段 1 (冲突排除, 可选来源):
+      - text_box 冲突 (exclude_text): 候选落 OCR 标号文字框内 → 拒
+      - 绿线冲突 (exclude_green): 候选远离绿线 (主路外) → 拒
+    阶段 2 (确认, 剩候选选优):
+      - 多源投票一致 + 质量分 (板间空/接线/距离) 选最优
+    排除源是**可选参数** (每个可独立开关, parameter space §7).
+    """
+    plates = detect_plates_on_wire(gray, pb, x, y, radius) if pb is not None else []
+    proj = find_cap_pairs_proj(gray, x, y, radius)
+    gaps = find_lines(pb, x, y, radius) if pb is not None else []
+    votes = [(p["cx"], p["cy"]) for p in plates] + \
+            [(g["cx"], g["cy"]) for g in gaps]
+
+    def _touch_green(cx, cy):
+        if green is None:
+            return True
+        tr = quality_kw.get("touch_r", 15)
+        return green[max(0, cy - tr):cy + tr,
+                     max(0, cx - tr):cx + tr].sum() > 0
+
+    def _exclude(cx, cy):
+        """冲突排除 (可选来源). 返回 True=应排除."""
+        if exclude_text and _in_box(cx, cy, text_box, label_pad):
+            return True
+        if exclude_green and not _touch_green(cx, cy):
+            return True
+        return False
+
+    cands = []
+    # 源 A: plates (先按距离粗筛, 只算最近的 top_n)
+    for p in sorted(plates, key=lambda p: abs(p["cx"] - x) + abs(p["cy"] - y))[:top_n]:
+        if _exclude(p["cx"], p["cy"]):
+            continue
+        s = cap_quality(gray, green, int(p["cx"]), int(p["cy"]), int(p["gap"]),
+                        18, "v", x, y, **quality_kw)
+        voted = 1 + sum(1 for g in gaps
+                        if abs(p["cx"] - g["cx"]) + abs(p["cy"] - g["cy"]) <= vote_tol)
+        cands.append({"cx": int(p["cx"]), "cy": int(p["cy"]), "gap": int(p["gap"]),
+                      "len": None, "dir": "v",
+                      "score": s - voted * vote_bonus, "src": "plates"})
+    # 源 B: proj (补充 plates 未覆盖处, 同样粗筛+排除)
+    for p in sorted(proj, key=lambda p: abs(p["cx"] - x) + abs(p["cy"] - y))[:top_n]:
+        if _exclude(p["cx"], p["cy"]):
+            continue
+        if any(abs(c["cx"] - p["cx"]) + abs(c["cy"] - p["cy"]) <= 6 for c in cands):
+            continue  # 已被 plates 覆盖
+        s = cap_quality(gray, green, p["cx"], p["cy"], p["gap"], p["len"],
+                        p.get("dir", "h"), x, y, **quality_kw)
+        voted = 1 + sum(1 for vx, vy in votes
+                        if abs(p["cx"] - vx) + abs(p["cy"] - vy) <= vote_tol)
+        cands.append({"cx": p["cx"], "cy": p["cy"], "gap": p["gap"],
+                      "len": p["len"], "dir": p.get("dir"),
+                      "score": s - voted * vote_bonus, "src": "proj"})
+    if cands:
+        best = min(cands, key=lambda c: c["score"])
+        return {"kind": "cap", "cx": best["cx"], "cy": best["cy"],
+                "gap": best["gap"], "len": best.get("len") or 0,
+                "dir": best["dir"], "src": best["src"],
+                "votes": _vote(proj, votes), "score": best["score"]}
+    # 兜底: 无候选, 用走线断口位置 (仍可排除文字框)
+    if gaps:
+        g = min(gaps, key=lambda g: abs(g["cx"] - x) + abs(g["cy"] - y))
+        if not _exclude(g["cx"], g["cy"]):
+            return {"kind": "cap", "cx": g["cx"], "cy": g["cy"],
+                    "gap": 0, "len": 0, "wire_only": True, "src": "gaps",
+                    "votes": _vote(proj, votes)}
+    return None
 
 
 def detect(gray, x, y, radius=80):
@@ -22,17 +174,14 @@ def detect(gray, x, y, radius=80):
     return None
 
 
-def detect(gray, x, y, radius=100, pb=None):
-    """电容检测: 优先用极板检测 (走线上的垂直粗线 = 极板, 方向已知).
+def detect(gray, x, y, radius=100, pb=None, green=None, **quality_kw):
+    """电容检测: 优先用多源投票 (板线对+极板+走线断口), 方向已知.
 
     找到一块极板知方向, 沿走线搜另一块, 两板中点 = 电容中心.
     """
-    if pb is not None:
-        plates = detect_plates_on_wire(gray, pb, x, y, radius)
-        if plates:
-            p = min(plates, key=lambda p: abs(p["cx"] - x) + abs(p["cy"] - y))
-            return {"kind": "cap", "cx": int(p["cx"]), "cy": int(p["cy"]),
-                    "gap": int(p["gap"]), "dir": "v"}
+    b = detect_robust(gray, pb, green, x, y, radius, **quality_kw)
+    if b is not None:
+        return b
     pairs = find_cap_pairs(gray, x, y, radius)
     if pairs:
         p = min(pairs, key=lambda p: abs(p["cx"] - x) + abs(p["cy"] - y))
@@ -41,19 +190,22 @@ def detect(gray, x, y, radius=100, pb=None):
     return None
 
 
-def detect_with_wire(pb, gray, x, y, radius=100):
+def detect_with_wire(pb, gray, x, y, radius=100, green=None, text_box=None,
+                     label_pad=4, top_n=60, exclude_text=True,
+                     exclude_green=False, **quality_kw):
     """走线↔符号互验定位电容: 走线断口 = 电容位置, 板线对确认, 引出线对齐走线.
 
     1. 走线断口 (两段黑走线) 中点 = 电容中心 (走线必终结于符号)
     2. 附近板线对确认是电容
     3. 引出线 (板线外缘) 应对齐走线
     """
-    # 1) 极板检测 (走线上的垂直粗线)
-    plates = detect_plates_on_wire(gray, pb, x, y, radius)
-    if plates:
-        p = min(plates, key=lambda p: abs(p["cx"] - x) + abs(p["cy"] - y))
-        return {"kind": "cap", "cx": int(p["cx"]), "cy": int(p["cy"]),
-                "gap": int(p["gap"]), "dir": "v"}
+    # 1) 多源投票 (板线对 + 极板 + 走线断口, 质量分最低, 冲突排除可选)
+    b = detect_robust(gray, pb, green, x, y, radius,
+                      text_box=text_box, label_pad=label_pad,
+                      top_n=top_n, exclude_text=exclude_text,
+                      exclude_green=exclude_green, **quality_kw)
+    if b is not None and not b.get("wire_only"):
+        return b
     # 走线断口定位
     gaps = find_lines(pb, x, y, radius)
     if not gaps:
@@ -140,9 +292,38 @@ def detect_plates_on_wire(gray, pb, x, y, radius=100, thick=3):
                 continue
             g = abs(out[i]["x"] - out[j]["x"])
             if 8 <= g <= 30:
+                # 板线实际中心: 在板线 x 处扫暗段, 用暗段中心作 cy (非走线 y)
+                cyi = _plate_center(pb, out[i]["x"], out[i]["y"])
+                cyj = _plate_center(pb, out[j]["x"], out[j]["y"])
+                cy = (cyi + cyj) // 2 if cyi and cyj else out[i]["y"]
                 caps.append({"cx": (out[i]["x"] + out[j]["x"]) // 2,
-                             "cy": out[i]["y"], "gap": g})
+                             "cy": cy, "gap": g})
     return caps
+
+
+def _plate_center(pb, x, y, span=25, thick=3):
+    """板线 (竖线) 实际暗段中心 y. 在 x 列扫 pb, 找最粗暗段的中点."""
+    H = pb.shape[0]
+    col = pb[max(0, y - span):min(H, y + span), x]
+    if col.size == 0:
+        return None
+    best = None
+    s = None
+    for i, v in enumerate(col):
+        if v:
+            if s is None:
+                s = i
+        else:
+            if s is not None:
+                ln = i - s
+                if ln >= thick and (best is None or ln > best[0]):
+                    best = (ln, (s + i) // 2 + y - span)
+                s = None
+    if s is not None:
+        ln = len(col) - s
+        if ln >= thick and (best is None or ln > best[0]):
+            best = (ln, (s + len(col)) // 2 + y - span)
+    return best[1] if best else None
 
 
 def match_mask(gray, mask, x, y, radius=80):
@@ -260,6 +441,15 @@ def real_template_match(gray, tpl, x, y, radius=120, scales=(0.6, 0.8, 1.0, 1.2,
     return best if best else None
 
 
+def _detect_one(pb, gray, green, sx, sy, tbox, radius, label_pad, top_n, use_wire, qk):
+    """单组件电容检测 (供并行 worker 调用)."""
+    if use_wire:
+        return detect_with_wire(pb, gray, sx, sy, radius, green,
+                                text_box=tbox, label_pad=label_pad,
+                                top_n=top_n, **qk)
+    return detect(gray, sx, sy, radius, pb, green, **qk)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--img", required=True)
@@ -268,6 +458,30 @@ def main():
     ap.add_argument("--sizes-db", default=None,
                     help="符号尺寸知识库 (取电容典型尺寸合成掩膜)")
     ap.add_argument("--match-th", type=float, default=0.4, help="掩膜匹配阈值")
+    ap.add_argument("--gap-empty-th", type=int, default=140,
+                    help="板间空暗像素阈值 (cap_quality)")
+    ap.add_argument("--gap-empty-frac", type=float, default=0.15,
+                    help="板间空最大暗占比 (超则罚)")
+    ap.add_argument("--gap-pen", type=int, default=120,
+                    help="板间非空惩罚分 (软惩罚, 不硬拒)")
+    ap.add_argument("--wire-px", type=int, default=2,
+                    help="两侧接线最少暗像素数")
+    ap.add_argument("--wire-pen", type=int, default=60,
+                    help="接线缺失惩罚分")
+    ap.add_argument("--touch-pen", type=int, default=40,
+                    help="不在绿线上惩罚分")
+    ap.add_argument("--touch-r", type=int, default=15,
+                    help="绿线触点判定半径")
+    ap.add_argument("--vote-tol", type=int, default=12,
+                    help="多源投票一致性容差")
+    ap.add_argument("--vote-bonus", type=int, default=15,
+                    help="多源投票一致加分")
+    ap.add_argument("--label-pad", type=int, default=4,
+                    help="text_box 硬排除 pad (候选落文字框 ±pad 内则拒)")
+    ap.add_argument("--top-n", type=int, default=60,
+                    help="每候选源只算最近的 top_n 个 (性能)")
+    ap.add_argument("--jobs", type=int, default=4,
+                    help="并行 worker 数 (0=不开线程池)")
     ap.add_argument("--wire", action="store_true",
                     help="用走线断口定位电容 (走线↔符号互验)")
     ap.add_argument("--template", default=None,
@@ -278,9 +492,12 @@ def main():
         sys.exit(f"cannot read {args.img}")
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     pb = None
+    green = None
     if args.wire:
         from common import pure_black_mask
+        from sch_greenline import color_mask
         pb = pure_black_mask(img, gray)
+        green = color_mask(img, "green")
     rtpl = None
     if args.template:
         rtpl = cv2.cvtColor(cv2.imread(args.template), cv2.COLOR_BGR2GRAY)
@@ -306,75 +523,86 @@ def main():
 
     db = load_db(args.db)
     n = n_match = 0
-    for c in db["components"]:
-        if c.get("membership") != "flow_through" or not c.get("refdes"):
-            continue
-        if c["refdes"].upper().startswith("C"):
-            sx, sy = c["symbol_pos"][0], c["symbol_pos"][1]
-            if pb is not None:
-                b = detect_with_wire(pb, gray, sx, sy, args.radius)
-            else:
-                b = detect(gray, sx, sy, args.radius)
-            c["symbol_type"] = "cap"
-            c["symbol_body"] = b
-            c["symbol_orientation"] = b.get("dir") if b else None
-            if rtpl is not None and b:
-                # 真实模板多尺度匹配 (学习自准确电容)
-                m = real_template_match(gray, rtpl, b["cx"], b["cy"])
+    qk = dict(gap_empty_th=args.gap_empty_th, gap_empty_frac=args.gap_empty_frac,
+              gap_pen=args.gap_pen, wire_px=args.wire_px, wire_pen=args.wire_pen,
+              touch_pen=args.touch_pen, touch_r=args.touch_r,
+              vote_tol=args.vote_tol, vote_bonus=args.vote_bonus)
+    targets = [c for c in db["components"]
+               if c.get("membership") == "flow_through" and c.get("refdes")
+               and c["refdes"].upper().startswith("C")]
+    if args.jobs and args.jobs > 0 and len(targets) > 1:
+        with ThreadPoolExecutor(max_workers=args.jobs) as ex:
+            futs = [(ex.submit(_detect_one, pb, gray, green,
+                               c["symbol_pos"][0], c["symbol_pos"][1],
+                               c.get("text_box"), args.radius,
+                               args.label_pad, args.top_n, args.wire, qk), c)
+                    for c in targets]
+            results = [(f.result(), c) for f, c in futs]
+    else:
+        results = [(_detect_one(pb, gray, green, c["symbol_pos"][0],
+                                c["symbol_pos"][1], c.get("text_box"),
+                                args.radius, args.label_pad, args.top_n,
+                                args.wire, qk), c) for c in targets]
+    for b, c in results:
+        if b is None and pb is not None:
+            b = detect(gray, c["symbol_pos"][0], c["symbol_pos"][1],
+                       args.radius, pb, green, **qk)
+        c["symbol_type"] = "cap"
+        c["symbol_body"] = b
+        c["symbol_orientation"] = b.get("dir") if b else None
+        if rtpl is not None and b:
+            # 真实模板多尺度匹配 (学习自准确电容)
+            m = real_template_match(gray, rtpl, b["cx"], b["cy"])
+            if m:
+                rscore, rloc, rscale = m
+                c["real_match"] = round(rscore, 3)
+                c["real_loc"] = rloc
+                c["real_scale"] = round(rscale, 2)
+                c["symbol_pos"] = rloc
+                b["cx"], b["cy"] = rloc
+        if mask is not None and b:
+            # 按方向生成掩膜 (垂直走线电容旋转 90°)
+            cmask = mask
+            if b.get("dir") == "v":
+                cmask = cv2.rotate(mask, cv2.ROTATE_90_CLOCKWISE)
+            # 掩膜验证: 当前位置对齐好则不移动 (防塌缩)
+            cur = mask_align_score(gray, cmask, b["cx"], b["cy"], 120)
+            c["mask_align"] = round(cur, 3)
+            if cur < 0.7:
+                # 仅在对齐差时探测矫正 (限制范围防塌缩)
+                mp = mask_probe(gray, cmask, b["cx"], b["cy"], span=20)
+                if mp:
+                    pscore, ploc = mp
+                    if pscore > cur:
+                        c["mask_align"] = round(pscore, 3)
+                        c["mask_loc"] = ploc
+                        c["symbol_pos"] = ploc
+                        b["cx"], b["cy"] = ploc
+            # 掩膜互验自校准: 不同缩放掩膜提取图区域
+            cal = calibrate_size(gray, b["cx"], b["cy"], mask, args.radius)
+            if cal:
+                cscore, scale, cw, ch = cal
+                c["mask_align"] = round(cscore, 3)
+                c["calib_scale"] = round(scale, 2)
+                c["calib_size"] = [cw, ch]
+                # 掩膜探索验证 (强无监督): 学习掩膜应在真实黑色电容体上对齐
+                best_mask = cv2.resize(mask, (cw, ch))
+                m = search_mask(gray, best_mask, b["cx"], b["cy"], args.radius)
                 if m:
-                    rscore, rloc, rscale = m
-                    c["real_match"] = round(rscore, 3)
-                    c["real_loc"] = rloc
-                    c["real_scale"] = round(rscale, 2)
-                    c["symbol_pos"] = rloc
-                    b["cx"], b["cy"] = rloc
-            if mask is not None and b:
-                # 按方向生成掩膜 (垂直走线电容旋转 90°)
-                cmask = mask
-                if b.get("dir") == "v":
-                    cmask = cv2.rotate(mask, cv2.ROTATE_90_CLOCKWISE)
-                # 掩膜验证: 当前位置对齐好则不移动 (防塌缩)
-                cur = mask_align_score(gray, cmask, b["cx"], b["cy"], 120)
-                c["mask_align"] = round(cur, 3)
-                if cur < 0.7:
-                    # 仅在对齐差时探测矫正 (限制范围防塌缩)
-                    mp = mask_probe(gray, cmask, b["cx"], b["cy"], span=20)
-                    if mp:
-                        pscore, ploc = mp
-                        if pscore > cur:
-                            c["mask_align"] = round(pscore, 3)
-                            c["mask_loc"] = ploc
-                            c["symbol_pos"] = ploc
-                            b["cx"], b["cy"] = ploc
-                # 掩膜互验自校准: 不同缩放掩膜提取图区域
-                cal = calibrate_size(gray, b["cx"], b["cy"], mask, args.radius)
-                if cal:
-                    cscore, scale, cw, ch = cal
-                    c["mask_align"] = round(cscore, 3)
-                    c["calib_scale"] = round(scale, 2)
-                    c["calib_size"] = [cw, ch]
-                    # 掩膜探索验证 (强无监督): 学习掩膜应在真实黑色电容体上对齐
-                    best_mask = cv2.resize(mask, (cw, ch))
-                    m = search_mask(gray, best_mask, b["cx"], b["cy"], args.radius)
-                    if m:
-                        score, mloc = m
-                        c["mask_match"] = round(score, 3)
-                        c["mask_loc"] = mloc
-                        c["symbol_pos"] = mloc
-                        b["cx"], b["cy"] = mloc
-                        if score >= args.match_th:
-                            n_match += 1
-            if b:
-                n += 1
-            c["sym_boundary"] = boundary_from_body(b)
+                    score, mloc = m
+                    c["mask_match"] = round(score, 3)
+                    c["mask_loc"] = mloc
+                    c["symbol_pos"] = mloc
+                    b["cx"], b["cy"] = mloc
+                    if score >= args.match_th:
+                        n_match += 1
+        if b:
+            n += 1
+        c["sym_boundary"] = boundary_from_body(b)
     save_db(db, args.db)
     print(f"[sch_cap] capacitor bodies: {n}")
     if mask is not None:
         print(f"[sch_cap] mask-match confirmed: {n_match}")
-
-
-if __name__ == "__main__":
-    main()
 
 
 if __name__ == "__main__":

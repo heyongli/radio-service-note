@@ -60,6 +60,12 @@
 
 ## 规范
 
+- [ ] **wire 真理度评估 (schema §3.5b)**: sch_wire 走线识别失败率未量化。
+      抽检 N 个符号引出线对齐走线率 → 标定可信度 (当前 40 弱约束)。
+      准确则升档作冲突排除 (符号应对齐走线)。
+- [ ] **电容识别参数调优 (best_practices §5b-4)**: 算法已稳定, 阈值全 CLI 化。
+      固定算法 → 单参数扫描 (--gap-empty-frac/--wire-px/--vote-bonus) →
+      对照 gt_rx_flow 看 hit<50px 指标曲线 → 找平衡点。基准: round029 8/14 hit。
 - [ ] **滚动数据统计 (architecture §14.5)**: 系统统计"哪些数据随 round 滚动、
       各自 delta、收敛还是发散"。候选: sch_symbol_sizes.json / symbol_body /
       sym_boundary / chain_order / components_index / waypoints。对发散数据加闸

@@ -90,12 +90,17 @@ python3 tools/sch_symbol/sch_symbol.py \
 
 分类型独立运行 (利用现存信息精识别):
 ```bash
-# 电容 (走线↔符号互验 + 掩膜)
+# 电容 (多源投票 + 走线↔符号互验 + 掩膜)
 python3 tools/sch_symbol/sch_cap.py \
   --img projects/icom2200h/render/rxtx-sch-600-1.png \
   --db projects/icom2200h/nettable/sch_components.json \
   --wire --sizes-db projects/icom2200h/nettable/sch_symbol_sizes.json \
   --match-th 0.4
+# 电容调参参数 (全 CLI 化, 调优规律见 best_practices §5b-4):
+#   --gap-empty-th/--gap-empty-frac  板间空检查 (过严漏检/过松误检)
+#   --wire-px/--wire-pen            接线约束权重
+#   --touch-pen/--touch-r           绿线触点
+#   --vote-tol/--vote-bonus         多源投票一致性
 # IC (识别型号)
 python3 tools/sch_symbol/sch_ic.py --img ... --db ... --model
 # 其他类型
@@ -118,3 +123,28 @@ python3 tools/sch_symbol/sch_varactor.py --img ... --db ...
 - 最终 chain_order 输出符号级坐标 (非标号坐标)
 与 PCB 侧 `pcb_package` (封装定位) 对应; 识别(本目录)与自我监督校验(sch_symbol_selfcheck)
 分层, 防止位置误判直接污染链序。
+
+## §7 parameter space (参数调优规律, 2026-09-17)
+
+**调参规律** (参数调整/优化是独立的复杂问题, 与算法本身分开对待):
+
+1. **先参数化再调优**: 阈值全走 CLI (architecture §5.9), 否则无法系统扫描。
+2. **评估闭环先行**: 调参必须有 GT + 量化指标 (如 hit<50px), 否则无法判断好坏。
+3. **约束窗口避开被测目标本身** (关键教训):
+   - C145: 板间空检查 band 含板线 → 暗占比 24% 被误杀, 实为合法电容
+   - 修正: band 只取两板内侧中央区, 板线外侧单独做接线探测
+4. **多源投票 > 单源优先** (各源有盲区):
+   - plates 海量假候选 (C269 997个); find_cap_pairs 方向可能误报 (C145)
+   - 三源 (板线对/极板/走线断口) 一致性 = 高置信
+5. **symbol_pos 本身会漂移**: C269 偏移 179px 超半径 → 需结合绿线触点/尺寸库反查。
+6. **调参策略**: 固定算法 → 单参数扫描 → 对照 GT 看指标曲线 → 找平衡点。
+   基准 (round029): 8/14 hit。
+
+可调参数空间 (sch_cap, 全 CLI):
+| 参数 | 含义 | 调优方向 |
+|---|---|---|
+| `--gap-empty-th`/`--gap-empty-frac` | 板间空检查 | 过严漏检, 过松误检 |
+| `--wire-px`/`--wire-pen` | 接线约束权重 | 引线是否必须存在 |
+| `--touch-pen`/`--touch-r` | 绿线触点 | 是否强制在 flow 上 |
+| `--vote-tol`/`--vote-bonus` | 多源投票 | 越大越信投票 |
+| `--radius` | 搜索半径 | 补偿 symbol_pos 漂移 |

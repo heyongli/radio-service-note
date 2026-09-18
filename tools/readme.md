@@ -8,7 +8,7 @@
 
 ## 全流程管线 (三大管线 + 同步闭环)
 
-```
+```bash
 ┌─ ① sch 管线 (原理图识别信号流) ─────────────────────────────┐
 │   sch_trace(沿绿线走线+符号) → sch_label_ocr(读标号)          │
 │     → sch_flow_walk(绿线流鉴别) → chain_order_rx.json        │
@@ -146,6 +146,10 @@ python3 tools/signal_flow_route/signal_flow_route.py \
   (schema §3.6 append 累积) + --correct 自我校准。属 architecture §14 无监督进化闭环,
   目录 `tools/sch_symbol_selfcheck/` (check_reverse_ocr.py / check_overlap.py /
   sch_symbol_selfcheck.py)。
+- **真理元素积累与复用 (2026-09-17, architecture §14.1c)**: 已确认事实
+  (OCR 文字框/绿线掩膜/符号尺寸/链序/走线) 不断入库, 随处可作真理源反哺识别:
+  text_box 硬约束排除 (候选落文字框=标号非符号), 绿线/尺寸弱约束排序加权。
+  实现: sch_cap.detect_robust 已接入 `_in_box` 排除 + 绿线触点弱约束。
 
 ### 下一步
 - bot 视图圆形裁切 pcb_label_ocr 全量跑 (已有 --limit 测试)

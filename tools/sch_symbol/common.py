@@ -124,6 +124,78 @@ def find_lines(pb_or_gray, x, y, radius=100, min_wire=40, pair_gap=15):
     return gaps
 
 
+def find_cap_pairs_proj(gray, x, y, radius=80, plate_len=(8, 60), gap_range=(6, 40),
+                        dark_th=140, overlap_min=6):
+    """投影法电容板线对 (不依赖 Hough 连续性, 对短板线/绿线干扰鲁棒).
+
+    走线水平时板线垂直 (竖板线对), 走线垂直时板线水平 (横板线对).
+    原理: 统计暗列/暗行投影, 找两列(行)暗长度相似、间距在 gap_range、
+          重叠长度 >= overlap_min、且板间基本空白的板线对.
+    返回 [{"cx","cy","gap","len","dir"}] 质心.
+    """
+    sub = gray[max(0, y - radius):y + radius, max(0, x - radius):x + radius]
+    if sub.size == 0:
+        return []
+    dark = (sub < dark_th).astype(np.uint8)
+    H, W = dark.shape
+    out = []
+
+    # 竖板线对 (dir=h: 走线水平, 板线垂直): 每列暗计数
+    col_dark = dark.sum(axis=0)  # shape (W,)
+    # 找暗列: 列暗 >= overlap_min 且中间连续
+    cols = [c for c in range(W) if col_dark[c] >= overlap_min]
+    for i in range(len(cols)):
+        for j in range(i + 1, len(cols)):
+            a, b = cols[i], cols[j]
+            gap = b - a
+            if not (gap_range[0] <= gap <= gap_range[1]):
+                continue
+            # 两列重叠长度 (取两列暗段的公共 y 范围)
+            la = col_dark[a]
+            lb = col_dark[b]
+            if max(la, lb) - min(la, lb) > max(6, min(la, lb) * 0.6):
+                continue
+            # 板间空: 两列之间暗占比
+            mid = dark[:, a + 1:b]
+            if mid.size and mid.mean() > 0.20:
+                continue
+            # 板线公共暗段 (两列都暗的行) 长度
+            both = (dark[:, a] & dark[:, b])
+            ys = np.where(both)[0]
+            if len(ys) < overlap_min:
+                continue
+            cy = int((ys.min() + ys.max()) / 2) + y - radius
+            cx = int((a + b) / 2) + x - radius
+            ln = max(ys.max() - ys.min(), 1)
+            out.append({"cx": cx, "cy": cy, "gap": int(gap), "len": int(ln), "dir": "h"})
+
+    # 横板线对 (dir=v: 走线垂直, 板线水平): 每行暗计数
+    row_dark = dark.sum(axis=1)  # shape (H,)
+    rows = [r for r in range(H) if row_dark[r] >= overlap_min]
+    for i in range(len(rows)):
+        for j in range(i + 1, len(rows)):
+            a, b = rows[i], rows[j]
+            gap = b - a
+            if not (gap_range[0] <= gap <= gap_range[1]):
+                continue
+            la = row_dark[a]
+            lb = row_dark[b]
+            if max(la, lb) - min(la, lb) > max(6, min(la, lb) * 0.6):
+                continue
+            mid = dark[a + 1:b, :]
+            if mid.size and mid.mean() > 0.20:
+                continue
+            both = (dark[a, :] & dark[b, :])
+            xs = np.where(both)[0]
+            if len(xs) < overlap_min:
+                continue
+            cx = int((xs.min() + xs.max()) / 2) + x - radius
+            cy = int((a + b) / 2) + y - radius
+            ln = max(xs.max() - xs.min(), 1)
+            out.append({"cx": cx, "cy": cy, "gap": int(gap), "len": int(ln), "dir": "v"})
+    return out
+
+
 def find_cap_pairs(gray, x, y, radius=80, plate_len=(10, 40), gap_range=(8, 30)):
     """提取电容双板线对 (两平行短线 = 板线, 与走线垂直). 返回质心.
 
