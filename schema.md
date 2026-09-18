@@ -107,6 +107,17 @@ center_pt = [c * 72 for c in center_inch]  # pt 单位
 
 ### 2.1 顶层结构
 
+**数据来源** (数据从哪来、怎么来的): 每条 refdes 坐标 = PCB 母图
+(`render/pcb-{top,bot}-600-1.png`) 上**该 refdes 丝印文字的实际位置**: 经
+矩形/圆形裁切 (crops/, 含母图 bbox) → OCR 识别文字 → 坐标变换 (crop 原点 +
+dpi 换算, §2b) → 按 `view` (top/bot/sch) 独立记录. 丝印只在单面的器件坐标
+只属该面; 视图镜像关系按板框对齐验证. 程序 (pcb_rect_locator/label_ocr 等)
+只是实现载体, 数据本质是"图上丝印位置 + 溯源链".
+
+**用途**: **元器件索引枢纽** —— 跨视图坐标映射的唯一权威源. 消费方:
+`make_config_from_chain` (chain 回填 pcb 位置)、`signal_flow_route`、`svg_render`
+(标注渲染)、`pcb_verify` (坐标校验)、`wpts` 生成器.
+
 ```json
 {
   "_meta": {
@@ -368,6 +379,16 @@ schematic_flow_walk ──► chain_order_rx.json ──► radio_design_flow (r
 
 ### 3.1 顶层
 
+**数据来源** (数据从哪来、怎么来的): 信号链序 = 原理图
+(`render/rxtx-sch-600-1.png`) 上的**彩线** (绿=RX/红或土黄=TX/黄=控制/青=common)
+掩膜 → 沿彩线 BFS 走线 → 局部符号检测 (电容/三极管/IC) → 标号 OCR 关联;
+绿线流经顺序与 block 图/文本层交叉验证得有序链. 程序 (sch_trace/label_ocr/
+flow_walk/symbol) 只是实现载体, 数据本质是"图上信号流经的元器件序".
+
+**用途**: **信号流经元器件图** (有序链, RX/TX/Control). 消费方:
+`make_config_from_chain` (chain + pcb 位置 → 路由 config)、`signal_flow_route`
+(waypoint 计算)、PCB 标注 (sch flow → PCB 落点).
+
 ```json
 {
   "_meta": {
@@ -621,9 +642,87 @@ schematic_flow_walk ──► chain_order_rx.json ──► radio_design_flow (r
 
 ---
 
+### 3.8 去标注图 deannot_*.png + 走线网表 wirenet.json + 彩线掩膜 (sch 中间产物)
+
+**数据来源** (数据从哪来、怎么来的):
+- `deannot_*.png`: 原理图 (`render/rxtx-sch-*.png`) 上去除信号流标注线后的
+  纯净底图. 方法见 de_annotate_* (lumfrac/chandiff/chmask/wirelum), 数据本质是
+  "标注从未存在的原理图".
+- `wirenet.json`: 去标注图上暗像素连通域 = 走线 net 网表 (无监督, 不依赖其他).
+  数据本质是"每个连通域 = 一个走线网络".
+- `*_mask.png` (彩线/绿线掩膜): 原理图上彩线 (绿=RX/红=TX/青=common) 颜色阈值
+  掩膜 (0/255), 数据本质是"信号流标注线的像素集合" (真理源, 可信度 95).
+
+**用途** (consumers):
+- `deannot_*.png` → `sch_wirenet` (走线 net 识别), 原理图纯净底图备查
+- `wirenet.json` → 主 net 掩膜 (真理源, 可信度 85), 元器件→net 关联, 电容判据
+  (真电容两侧 net 不同), de-wire 切除走线
+- 彩线掩膜 → 走线引导 / 符号识别 (绿线触点弱约束) / 冲突排除 / 渲染
+
+**数据位置**: `projects/<机型>/annot/deannot_*.png` (图) / `nettable/wirenet.json` (网表)
+
+```json
+// wirenet.json
+{"_meta": {"purpose": "sch 走线 net 网表 (无监督连通域)", "format": "json {nets[]}", ...},
+ "total_nets": 5963, "total_dark_px": 1188795,
+ "main_net": {"id": 13, "area": 903588, "ratio": 0.76, "is_main": true},
+ "nets": [{"id": 13, "area": 903588, "bbox": [x,y,w,h]}]}
+```
+
+---
+
+### 3.9 标注区域 annot_regions.json (annotation_detect)
+
+**数据来源** (数据从哪来、怎么来的): 原理图 (`render/rxtx-sch-*.png`) 上
+**彩色标注像素** (BGR 通道差 > 阈值) 的连通域 → 每个区域 bbox + 主色 (中位 BGR).
+数据本质是"图上标注线条的矩形区域".
+
+**用途** (consumers): ROI 局部化 (de-annotation 只在这些区域 ±scale 内处理,
+避免全局参数顾此失彼); 区域染纯色 (识别→分段矩形→填充); 标注区域数据库.
+
+**数据位置**: `projects/<机型>/nettable/annot_regions.json` + `annot_regions_mask.png`
+
+```json
+{"_meta": {"purpose": "annotation region detect", ...},
+ "count": 375,
+ "regions": [{"id": 1, "bbox": [x,y,w,h], "area": 139, "color_bgr": [b,g,r]}]}
+```
+
+---
+
+### 3.10 OCR 运行数据库 ocr_runs/*.json
+
+**数据来源** (数据从哪来、怎么来的): 对某张图跑 OCR 的一次运行归档
+(RapidOCR PP-OCRv4/v5/v6, 参数/引擎/输入图快照). 每字含 `text/conf/px/box`.
+数据本质是"图上文字识别结果 + 运行参数溯源".
+
+**用途** (consumers): 文字→位置反查 (如图例锚点 `note_box_locate`)、
+refdes 定位 (`pcb_index`)、调参对比 (`compare_runs.py`)、真理源 (text_box 排除).
+
+**数据位置**: `projects/<机型>/ocr_runs/` (只增不删, 严禁 annot/crops/svg_runs 子目录)
+
+```json
+{"run_id": "...", "tool_version": "0.2.0", "date": "...",
+ "params": {"img": "...", "img_dpi": 300, "preset": "fast", ...},
+ "engines": {"stage1": {"v4": "..."}, "stage2": {...}},
+ "hits": [{"text": "...", "conf": 0.96, "px": [x,y], "box": [[...]]}]}
+```
+
+---
+
 ## 4. wpts_*.json 元数据规范
 
 ### 4.1 顶层 (每个 wpts 文件首个条目)
+
+**数据来源** (数据从哪来、怎么来的): waypoint = **sch 链序** (chain_order:
+原理图信号流经元器件) 与 **pcb 位置** (pcb_index: PCB 丝印坐标) 的结合:
+make_config 把 chain 每个器件映射到 pcb 坐标 → 路由算法 (signal_flow_route)
+计算拐点/避让/跨面方式 → 得每个连接段的 `px/through` 等. `source` 字段记录
+组成来源 (chain + index). 程序只是实现载体, 数据本质是"信号流在 PCB 上的
+标注路径".
+
+**用途**: **渲染的唯一输入** —— `svg_render.py` 读 wpts 渲染标注图 (PNG/SVG).
+所有坐标统一 600dpi top view 空间, 实线=确认/虚线=推断.
 
 ```json
 {
