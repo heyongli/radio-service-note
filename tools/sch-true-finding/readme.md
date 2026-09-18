@@ -4,7 +4,10 @@
 | 文件 | 用途 |
 |---|---|
 | `sch_true_greenline.py` | 绿线真理发现: 彩线掩膜 (绿/红/黄/青) + 统计 |
-| `de_annotate.py` | **去除信号流标注线** (de-annotation, 原名 de_greenline): 从原理图移除全部彩线标注 (绿/红/黄/青, 含深色描边扩展), 得"标注从未存在"底图; v0.3 起含**自监督桥恢复 + 指标报告** (--restore / --metrics) |
+| `de_annotate_lumfrac.py` | **信号流标注去除 (固化版, 用户裁定最终答案 2026-09-17)**: 段内暗芯法, 不断线不变细. 方法简称=lumfrac → 命名 de_annotate_lumfrac |
+| `de_annotate_chandiff.py` | 标注去除 (chandiff 版, 曾为最终; 会断线/变细, 已被 lumfrac 取代) |
+| `de_annotate.py` | (实验版, 含 --restore/--wire-lum/线续接等被证伪尝试, 仅供研究) |
+| `explore_wire_core.py` | 探索工具: 多种取芯方法对比 (lum_frac/ridge/blackhat), 产出中间图供远程检查 |
 | `readme.md` | 本文档 (修改前必读) |
 
 ## §2 定位 (sch 管线中的位置与作用)
@@ -48,14 +51,15 @@ python3 tools/sch-true-finding/sch_true_greenline.py \
   --img projects/icom2200h/render/rxtx-sch-600-1.png \
   --color green --stats --out /tmp/opencode/green_mask.png
 
-# de-annotation: 独立运行, 不依赖其他真理元素 (纯 BGR 通道差, 推荐)
-python3 tools/sch-true-finding/de_annotate.py \
+# de-annotation: 独立运行 (固化版 = de_annotate_chandiff, 纯 BGR 通道差, 用户裁定最终答案)
+python3 tools/sch-true-finding/de_annotate_chandiff.py \
   --img projects/icom2200h/render/rxtx-sch-600-1.png \
-  --out /tmp/opencode/deannot.png --color all --diff-th 40
+  --out /tmp/opencode/deannot.png --diff-th 40
 ```
 
-> 注: 本工具是 **de-annotation** (去全部彩线标注), 原名 de_greenline; --color green
-> 仅是兼容旧名的选项. 修改前必读 readme.md 全文.
+> 注: 本工具是 **de-annotation** (去全部彩线标注), 原名 de_greenline.
+> **生产/最终答案 = de_annotate_chandiff.py**; `de_annotate.py` (实验版) 的
+> --restore/--wire-lum/线续接均被证伪, 仅供研究. 修改前必读 readme.md 全文.
 
 ## §4b 呈现给真人监督员校验 (human supervision)
 
