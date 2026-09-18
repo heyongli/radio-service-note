@@ -237,21 +237,32 @@ OCR 数据库里识别出说明框标题类的文字作锚点.
 
 ### 输出模式: color layer (颜色图层, 2026-09-18 定稿)
 
-**图层输出模式** (用户裁定): 白底 + **灰色原理图** + **目标信号色高亮**.
-"只有目标信号是彩色, 其他是灰色" —— 一眼看出该信号标注位置. 重要视觉结果.
+**三 stage 管线** (工具 `color_layer.py`, 用 legend 准确色):
 
 ```
-rx_color_layer.png  = 灰原理图 + RX(绿) + common(青) 彩色
-tx_color_layer.png  = 灰原理图 + TX(土黄) + common(青) 彩色
+stage1 图层:       白底 + 非目标内容调淡(--fade 0.45) + 目标信号色高亮
+                    → <signal>_color_layer.png   (一眼看信号位置)
+stage2 去灰纯区域:  --pure → 白底+纯目标色 (饱和度阈值 --sat-min 100 去灰)
+                    → <signal>_line_region.png
+stage3 填实:        --heal → 直接 legend 色掩膜纯填实 (3over2样式)
+                    → <signal>_healed.png   (--border 加1px框 / --continu 方向闭接续)
 ```
+
+**自监督线宽** (legend 色样本条带厚度测量, `legend_line_width`): stage3 合并核
+默认 = 参考线宽 (实测 16px). 线宽学习剔除"突然最大值" (胖体/元器件).
 
 命令:
 ```bash
 python3 tools/sch-true-finding/color_layer.py --img sch-600.png \
-  --legend explanatory_notes.json --signals RX,COMMON --out rx_color_layer.png
+  --legend explanatory_notes.json --signals RX --out rx_color_layer.png   # stage1
+python3 tools/sch-true-finding/color_layer.py --img sch-600.png \
+  --legend explanatory_notes.json --signals RX --pure --out rx_line_region.png
+python3 tools/sch-true-finding/color_layer.py --img sch-600.png \
+  --legend explanatory_notes.json --signals RX --heal --out rx_healed.png
 ```
 
-工具: `color_layer.py` (通用, --signals 可组合; 输出命名 `<signal>_color_layer.png`).
+**不同机型**: 锚点文字可能不同 (Explanatory/LEGEND/注...), 工作流不变, 只需在
+OCR 数据库里识别出说明框标题类的文字作锚点.
 
 **命令**:
 ```bash
