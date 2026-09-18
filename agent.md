@@ -1,10 +1,10 @@
 
-* 开始任务前先 load best_practices.md, 按其中的已验证结论操作, 避免重复踩坑
 * git 提交纪律 : 不要自动 commit; 等用户明确要求 commit 执行。
 * git 提交纪律 : 永远不要 `git add -f`, 尊重 .gitignore 规则, projects/ 等目录不进 git。
 * 未确认的坐标要记录并在渲染时忽略 不得臆造坐标
 * 修改任何工具/程序前, 必须先完整阅读其 `readme.md`; 改动不得破坏 readme 中固化的原则并保持重要算法
-* 要阅读 archtecure.md 相关章节， 和对应工具的readme
+* 要阅读 archtecure.md，任务对应工具的readme，以及best_practices.md相关知识
+* 所有输出都放到project对应的annot目录， 如果是临时检测，更新同一个文件即可不需要给文件编号
 * 保持readme和代码的tracking关系
 * 保持schema.md 对数据格式追踪关系
 * 保持tools/readme 包含对管线设计的追踪关系
@@ -13,7 +13,6 @@
 * **调参/算法改动前, 先定义"应然自监督指标"** (architecture §14.1f):
   每个处理步骤都有一个"处理后应然状态" (如去标注后走线连通性不恶化、
   线宽离散化后细颈消除、电容两侧 net 不同)。用指标验证效果, 不依赖人工看图。
-* 所有输出都放到project对应的annot目录， 如果是临时检测，更新同一个文件即可不需要给文件编号
 
 ## 项目介绍
 * 通过pdf或者图片的电路图, 信号流程图, 在实物pcb照片或者维修pcb的点位图上标注信号流程

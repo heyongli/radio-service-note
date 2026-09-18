@@ -563,6 +563,64 @@ schematic_flow_walk ──► chain_order_rx.json ──► radio_design_flow (r
 
 ---
 
+### 3.7 图例数据库 explanatory_notes.json (颜色→信号 权威真值)
+
+**定位**: 原理图说明框 (虚线方块) 的**图例** —— 每条 = OCR 文字标签 +
+对应**色彩样本** (准确线条颜色). 是 "颜色→信号" 的**权威校准源**
+(绿=RX / 橙土黄=TX / 青=common / 品红=电压), 供 COLOR_SPEC 探测校准
+(tools/sch-true-finding/readme §9, legend_extract.py) 直接读取, 不必猜测.
+
+**数据来源 (provenance)**: 
+- 说明框由 `note_box_locate.py` 定位 (OCR 锚点文字 → dash 虚线边框, `_meta.box`)
+- 文字标签 = OCR 数据库反查 (框内文字, `entries[].label/px/conf`)
+- 色彩样本 = 从框内按行提取的彩色像素中位色 (`entries[].color_bgr`)
+- 坐标统一 img 空间 (600dpi), dpi 换算见 §1.3
+
+**用途 (consumers)**:
+- `COLOR_SPEC` 探测校准 (tools/sch-true-finding/de_annotate_*.py): 读取本库得
+  各信号线的准确颜色阈值, 不靠猜测
+- 信号流区分 (RX/TX/common/电压 线): 按 `label` 映射信号类型
+- 跨机型复用: 不同机型锚点文字不同但结构类似, 提取后入库统一校准
+
+**数据位置**: `projects/<机型>/nettable/explanatory_notes.json`
+
+```json
+{
+  "_meta": {"purpose": "explanatory notes legend (color->signal truth)",
+            "format": "json", "version": "0.1",
+            "source": "projects/.../render/rxtx-sch-600-1.png",
+            "box": [4115, 982, 298, 207]},
+  "entries": [
+    {"label": "VOLTAGE LINE", "px": [4334, 1044], "conf": 0.91,
+     "color_bgr": [138, 6, 227]},
+    {"label": "TX LINE", "px": [4302, 1084], "conf": 0.93,
+     "color_bgr": [19, 135, 246]},
+    {"label": "RX LINE", "px": [4304, 1124], "conf": 0.85,
+     "color_bgr": [80, 166, 0]},
+    {"label": "COMMON LINE", "px": [4334, 1164], "conf": 0.92,
+     "color_bgr": [239, 173, 0]}
+  ]
+}
+```
+
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| `_meta.box` | [x,y,w,h] | 说明框 bbox (img 空间, 虚线框定位所得) |
+| `entries[].label` | str | OCR 文字标签 (图例名) |
+| `entries[].px` | [x,y] | 文字中心 (img 空间, OCR 反查) |
+| `entries[].conf` | float | OCR 置信度 |
+| `entries[].color_bgr` | [b,g,r] | 该行色彩样本中位色 (OpenCV BGR) |
+
+**生产流程** (legend_extract 工作流, tools/sch-true-finding/readme §9):
+1. `note_box_locate.py`: OCR 找锚点文字 → 定位虚线框 → `_meta.box`
+2. `legend_extract.py`: 框内反查 OCR 文字 + 按行提色样本, 文字↔色带按 y 对齐
+3. 色彩样本 = 准确线条颜色 → 校准 COLOR_SPEC 阈值 (readme §8)
+
+**不同机型**: 锚点文字可能不同 (Explanatory/LEGEND/注...), 但结构类似;
+工作流不变, 只需在 OCR 数据库里识别说明框标题类文字作锚点.
+
+---
+
 ## 4. wpts_*.json 元数据规范
 
 ### 4.1 顶层 (每个 wpts 文件首个条目)

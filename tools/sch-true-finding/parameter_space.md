@@ -107,7 +107,30 @@
 - frac 扫描 (保留芯数/main_kept/main_CC): 0.15→37k/68.1%/616, 0.25→62k/70.5%/1153,
   0.40→112k/75.0%/1883. 25% 是"足够保留+不过度"的平衡.
 
-### 2026-09-17 round G2 — 方法对比总表 (用户要求记录, 算法保留)
+### 2026-09-17 round H — lumfrac 擦除参数 (用户要求记录; 沿绿线有边缘剩余)
+- **问题**: lumfrac 擦除后沿标注线 (尤其绿) 有边缘剩余/没擦干净的地方.
+  定位: 残留是 chandiff 10-40 的浅色像素 (标注带抗锯齿边缘), chandiff>40 掩膜
+  没抓住; 且 keep_color 前芯被染成灰 (用户要求保持彩色).
+- **参数 (de_annotate_lumfrac.py)**:
+  | 参数 | 默认 | 作用 | 实测 |
+  |---|---|---|---|
+  | `--frac` | 0.25 | 每段保留亮度最低比例 (暗芯=走线) | 0.15-0.40 扫描见 round G |
+  | `--light-th` | 0(关) | 浅色残留清除: chandiff>此值也置白 (清带边缘) | 15/12/10/8 → light_resid 75k/71k/52k/52k |
+  | `--keep-color` | 关 | 保留芯用原彩色 (绿线保持绿), 不染走线灰 | 用户要求保持彩色 |
+- **keep_color 后 colored_resid 计数含保留芯** (52000-55000 是保留的绿芯, 非残留);
+  需另看 light_resid(10-40) 判断擦除干净度. light-th 8-10 擦得更净.
+- **待调平衡**: light-th 过低会吃走线边缘 (把灰走线的浅色抗锯齿也置白), 
+  需对照视觉定平衡点 (当前测试 lt 8-15).
+
+### 2026-09-17/18 round H2 — 三个候选方案并存 (用户裁定: 各有优缺点, 先都保留)
+| 方案 | 文件 | 彩色px | 暗px | 用户评估 |
+|---|---|---|---|---|
+| chandiff (`de_annotate_chandiff.py`) | annot/deannot_chandiff.png | 0 | 847022 | **清理色块最干净, 但容易断线** |
+| chmask 通道掩膜 (`de_annotate_chmask.py`) | annot/deannot_deannotate.png | 16901 | 849836 | 也还行 (中间) |
+| lumfrac 保色 (`de_annotate_lumfrac.py`) | annot/deannot_lumfrac.png | 52042 | 896113 | 不断线, 保留绿芯(彩色多) |
+- 核心权衡: **chandiff 色块最干净↔断线; lumfrac 不断线↔彩色残留多**; chmask 居中.
+- 三个独立固化程序均在 `tools/sch-true-finding/` (de_annotate_chandiff / _chmask / _lumfrac).
+- 均未用 OneDrive 同步 (用户要求不再上传 OneDrive).
 | 方法 | main_kept | main_CC | 宽线px | 用户判定 |
 |---|---|---|---|---|
 | chandiff (de_annotate_chandiff) | 64.5% | 258 | 25k | 断线/变细, 曾为最终 |
