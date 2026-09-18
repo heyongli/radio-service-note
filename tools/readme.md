@@ -95,6 +95,30 @@ sch_wire/ (走线↔符号互验) → sch_render (渲染) → chain_order_rx.jso
 | `sch_wire/` | 纯黑图层 | 走线骨架 / 连接圆点 | 走线↔符号互验, 引出线对齐 |
 | `sch_render/` | sch_components.json | roundXXX.png | 渲染层, 供人工检查 |
 
+### 标注↔wire 相互提高子管线 (two-pass, architecture §14.1c)
+
+标注线 (绿/红/青/黄) 与 wire 走线**相互支持**: 标注必在 wire 上,
+标注去除后 wire 更纯净。三阶段, 每阶段参数化可独立跑:
+
+```
+阶段1 基础 wire 识别 (无依赖)
+  sch_wirenet: 暗像素连通域 = net → 主net/断片 → wirenet.json (真理源 85)
+阶段2 用 wire net 辅助识别标注 (互证)
+  de_greenline: 标注 = 高饱和彩色 (--s-min 80 排除低饱和走线)
+  → 去标注, 标注下走线填走线色恢复 (--fill-wire)
+阶段3 高级 wire 识别 (去标注后无污染)
+  连通域/骨架/线宽离散化 → 更纯 net → 反哺阶段2 → 循环进化
+```
+
+| 阶段 | 工具 | 关键参数 | 产出 |
+|---|---|---|---|
+| 1 粗 net | `sch_wirenet.py` | --dark-th 150 | wirenet.json + 主net掩膜 |
+| 2 去标注 | `de_greenline.py` | --color all --s-min 80 | 去标注图 |
+| 3 精 net | `sch_wirenet.py` (复用) | 输入=阶段2输出 | 纯净 net 网表 |
+
+**互证要点**: 标注高饱和 (s>80)/走线低饱和 (s≤80) → --s-min 防误删;
+标注 80% 盖走线 → 去标注填走线色恢复 (非置白), 走线连通域 78% 主域。
+
 ## 典型操作
 
 ```bash

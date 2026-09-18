@@ -36,6 +36,29 @@ def wire_nets(img, dark_th=150):
     return labels, stats, dark
 
 
+def skeletonize_medial(net_mask):
+    """中轴骨架 (距离变换极大值). 快, 用于线宽离散化."""
+    from scipy import ndimage
+    m = (net_mask > 0).astype(np.uint8)
+    if not m.any():
+        return m
+    dist = ndimage.distance_transform_edt(m)
+    mx = ndimage.maximum_filter(dist, size=3)
+    return ((dist == mx) & (m > 0)).astype(np.uint8)
+
+
+def normalize_width(net_mask, width=5):
+    """线宽离散化: 中轴骨架 + 统一膨胀到 width (消除细颈断口).
+
+    wire 识别注意走线宽度 (best_practices §5b-3): 走线有粗细变化,
+    细颈 (1px 连接) 脆弱 → 腐蚀会断开. 离散化 = 骨架 + 统一线宽恢复,
+    腐蚀只恢复当前识别线宽, 消除断口.
+    """
+    sk = skeletonize_medial(net_mask)
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (width, width))
+    return cv2.dilate(sk, k)
+
+
 def skel(net_mask):
     """Zhang-Suen 骨架化单 net. 返回 0/255 骨架."""
     return _thin(net_mask)
@@ -86,6 +109,10 @@ def main():
     ap.add_argument("--main-min", type=float, default=0.5,
                     help="主 net 需占暗像素比例阈值")
     ap.add_argument("--save-main", default=None, help="保存主 net 掩膜 PNG")
+    ap.add_argument("--skeleton", action="store_true",
+                    help="线宽离散化: 主 net 中轴骨架+统一线宽恢复 (消除细颈断口)")
+    ap.add_argument("--width", type=int, default=5,
+                    help="骨架统一线宽 (离散化目标宽度)")
     args = ap.parse_args()
 
     img = cv2.imread(args.img)
@@ -112,6 +139,8 @@ def main():
         main_net["is_main"] = ratio >= args.main_min
         if args.save_main:
             m = (labels == main_net["id"]).astype(np.uint8) * 255
+            if args.skeleton:
+                m = normalize_width(m // 255, args.width) * 255
             cv2.imwrite(args.save_main, m)
             main_net["main_mask"] = args.save_main
 

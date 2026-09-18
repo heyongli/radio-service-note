@@ -43,9 +43,15 @@ sch-true-finding (本目录: 真理发现) → 供所有下游
 
 ## §4 用法
 ```bash
+# 绿线掩膜
 python3 tools/sch-true-finding/sch_true_greenline.py \
   --img projects/icom2200h/render/rxtx-sch-600-1.png \
   --color green --stats --out /tmp/opencode/green_mask.png
+
+# de-annotation: 独立运行, 不依赖其他真理元素 (纯 BGR 通道差, 推荐)
+python3 tools/sch-true-finding/de_greenline.py \
+  --img projects/icom2200h/render/rxtx-sch-600-1.png \
+  --out /tmp/opencode/deannot.png --color all --diff-th 40
 ```
 
 ## §4b 呈现给真人监督员校验 (human supervision)
@@ -93,3 +99,28 @@ sch_wire/sch_symbol/sch_cap 原各有副本), 提供**单一权威真理发现�
 "绿线从未存在"。但绿线边界有**深色描边** (抗锯齿, 残留淡绿), 需扩展掩膜:
 核心颜色阈值 (g>120) + 描边扩展 (色相 55-90° 绿 + 灰度 40-200 + 非核心)。
 实测: 核心 184391 px, 描边扩展 +37k, 扩展不含黄 (黄 h<50) 不吞纯黑走线 (灰<40)。
+
+## §6 标注线在走线下方 (关键结论, 2026-09-17 两次确认)
+
+**结论**: 信号流标注线 (绿/红/黄/青) 画在**走线下面**, 不是盖在走线上。
+- 走线覆盖处标注**不可见**; 标注只在**走线断开处露出** (亮, 灰度≥150)
+- 深色标注线 (如深红 TX 线) 独立存在, 色相红且灰度暗 (灰度<150), 非走线上的标注
+
+**去除标注 = 置白丢弃, 绝不做"填走线色恢复"**:
+- ❌ wire-fill (标注填走线色) → 标注线变成**超宽走线段** (视觉错误)
+- ✅ 置白 (fill=255) → 标注消失, 走线不受影响
+
+**标注识别最佳方法 = BGR 通道差 (2026-09-17 实测最佳)**:
+- **走线 = 灰 (BGR 三通道接近, 通道差小)**; **标注 = 彩色 (通道差大)**
+- `maxdiff = max(|G-R|, |G-B|, |R-B|)`, 阈值 >40 = 标注
+- **比 HSV 饱和/色相可靠**: 暗走线在 HSV 下饱和/色相噪声大 (误删走线),
+  BGR 通道差稳定 (走线灰 → 通道差≈0)
+- **de-annotation 方案 = chandiff 删彩色** (用户选定, 效果直观):
+  `--diff-th 40` 删除高通道差彩色像素 (标注消失), 保留低通道差走线
+- ❌ 废弃: 走线宽度恢复 (骨架+原宽) — 线段消失, 效果不好
+  ❌ 废弃: 标注填走线色 (wire-fill) — 标注变超宽走线段
+- 走线略细是接受的代价 (标注覆盖走线中心, 删标注后中心变细)
+
+**踩坑记录**: 此问题出现**多次** (de-greenline wire-fill / de-annotation wire-fill /
+宽度恢复), 均因过度工程 (恢复走线) 而失败。正确做法是**直接删彩色置白** (chandiff)。
+每次改 de_greenline 前先读本节, 不要再犯恢复走线的错误。
