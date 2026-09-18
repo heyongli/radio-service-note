@@ -12,7 +12,7 @@
 import argparse, re, sys
 import cv2
 from rapidocr_onnxruntime import RapidOCR
-from common import find_rects, load_db, save_db
+from common import find_rects, load_db, save_db, boundary_from_body
 
 
 def detect(gray, x, y, radius=100):
@@ -66,6 +66,7 @@ def main():
             b = detect(gray, sx, sy, args.radius)
             c["symbol_type"] = "ic"
             c["symbol_body"] = b
+            c["sym_boundary"] = boundary_from_body(b)
             if ocr:
                 c["ic_model"] = detect_model(gray, ocr, sx, sy, args.radius)
             if b:

@@ -1,3 +1,4 @@
+
 # TODO — 后续路线
 
 按优先级/依赖排列。架构见 `architecture.md`, 工具进度见 `tools/README.md`。
@@ -59,6 +60,10 @@
 
 ## 规范
 
+- [ ] **滚动数据统计 (architecture §14.5)**: 系统统计"哪些数据随 round 滚动、
+      各自 delta、收敛还是发散"。候选: sch_symbol_sizes.json / symbol_body /
+      sym_boundary / chain_order / components_index / waypoints。对发散数据加闸
+      (如尺寸偏离典型 ±60% 标 size_dev)。
 - [ ] nettable/SCHEMA.md 随 schema 演进同步更新; components_index 0.2
       (package/pins 字段) 设计时先写规范再动数据。
 - [ ] 旧 tesseract 管线(pcb_designator_ocr)确认无引用后移 archive 说明。

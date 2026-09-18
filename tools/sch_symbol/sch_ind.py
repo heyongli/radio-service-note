@@ -9,7 +9,7 @@
 """
 import argparse, sys
 import cv2
-from common import pure_black_mask, load_db, save_db
+from common import pure_black_mask, load_db, save_db, boundary_from_body
 from sch_res import detect  # 电感/电阻同用线断口定位
 
 
@@ -33,6 +33,7 @@ def main():
             b = detect(pb, c["symbol_pos"][0], c["symbol_pos"][1], args.radius)
             c["symbol_type"] = "ind"
             c["symbol_body"] = b
+            c["sym_boundary"] = boundary_from_body(b)
             if b:
                 n += 1
     save_db(db, args.db)

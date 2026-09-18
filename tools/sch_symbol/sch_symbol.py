@@ -8,7 +8,7 @@ purpose: 按符号类型识别原理图元器件本体 (区分本体 vs 引出�
           - 电阻/电感(res/ind): 黑线断口 = 端点, 中心 = 断口中点
         对应 PCB 侧 pcb_package (封装识别). 消费 sch_components.json 候选,
         输出每个组件的 symbol body (kind/cx/cy/r 或 x/y/w/h).
-        sch_symbol_verify 消费本模块结果做验证.
+        sch_symbol_selfcheck 消费本模块结果做验证.
 
 用法:
   python3 sch_symbol.py --img sch.png --db sch_components.json
@@ -16,6 +16,7 @@ purpose: 按符号类型识别原理图元器件本体 (区分本体 vs 引出�
 
 import argparse
 import json
+import os
 import sys
 
 import cv2
@@ -205,6 +206,9 @@ def main():
         body = detect_body(gray, pb, c["symbol_pos"][0], c["symbol_pos"][1], sym, args.radius)
         c["symbol_type"] = sym
         c["symbol_body"] = body
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from common import boundary_from_body
+        c["sym_boundary"] = boundary_from_body(body)
         if body:
             n_found += 1
     tmp = args.db + ".tmp"

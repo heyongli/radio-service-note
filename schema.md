@@ -429,6 +429,19 @@ schematic_flow_walk ──► chain_order_rx.json ──► radio_design_flow (r
       "text_pos": [1309, 1638],        // 标号文字位置 (600dpi)
       "symbol_pos": [1316, 1674],      // 原理图符号位置 (600dpi)
       "symbol_type": "cap|circle|ic",  // 符号形状
+      "symbol_orientation": "h|v",     // 符号方向 (电容: 走线水平=h/垂直=v; 板线与之垂直)
+      "symbol_body": {                 // 符号本体 (sch_symbol 识别)
+        "kind": "circle|rect|cap|line|diode",
+        "cx": 2381, "cy": 1706,        // 本体中心
+        "gap": 9, "len": 27,           // cap: 板间距/板长
+        "dir": "v"                     // cap 方向
+      },
+      "sym_boundary": {                // 符号最小包含 (sch_symbol 识别产出, boundary_from_body)
+        "kind": "circle|rect",         // 归一化: 圆=外接圆, 其余=外接框
+        "cx": 2381, "cy": 1706,        // circle: 中心
+        "r": 22,                       // circle: 半径
+        "x": 1369, "y": 1693, "w": 27, "h": 22   // rect: 外接框 (cap=len×gap)
+      },
       "text_symbol_dist": 42,          // 标号→符号距离
       "green_touch": true,             // 符号是否触点绿线
       "green_sides": ["E", "W"],       // 符号侧边绿线方向
@@ -447,6 +460,9 @@ schematic_flow_walk ──► chain_order_rx.json ──► radio_design_flow (r
 
 **字段规则**:
 - `symbol_pos` 是符号位置, ≠ `text_pos` (标号在符号上方)
+- `symbol_body` 本体由 sch_symbol 识别; `sym_boundary` = 本体最小包含 (归一化 rect/circle),
+  由 `common.boundary_from_body()` 生成, 供 check_overlap (重叠) / sch_render (边界绘制) /
+  尺寸知识库 (body_size) 消费
 - `membership` 三态: flow_through (绿线两侧共线通过=主路) / branch (单侧=支路) /
   none (不触点绿线)
 - 鉴别依据 (ICOM/Yaesu 域特征, best_practices §5b-3)
@@ -479,7 +495,7 @@ schematic_flow_walk ──► chain_order_rx.json ──► radio_design_flow (r
 | `size` | [w, h] | 符号本体尺寸 (px, 600dpi) |
 | `refdes` | str | 记录来源 (溯源) |
 
-**不断丰富机制** (sch_symbol_verify 消费):
+**不断丰富机制** (sch_symbol_selfcheck 消费):
 - 每个**确认 OK** 的符号, 其本体尺寸**追加**到知识库 (append, 不覆盖)
 - `typical_size()`: 中位宽/高 = 该类型典型尺寸 (随样本增多趋于稳定)
 - `check_size()`: 新符号尺寸偏离典型 ±60% 以上 → 标记 `size_dev` (疑似识别错误)

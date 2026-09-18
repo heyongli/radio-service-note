@@ -12,7 +12,7 @@
 ┌─ ① sch 管线 (原理图识别信号流) ─────────────────────────────┐
 │   sch_trace(沿绿线走线+符号) → sch_label_ocr(读标号)          │
 │     → sch_flow_walk(绿线流鉴别) → chain_order_rx.json        │
-│     → sch_symbol(符号本体识别) → sch_symbol_verify(验证)      │
+│     → sch_symbol(符号本体识别) → sch_symbol_selfcheck(自我监督校验)   │
 │     → sch_wire(走线识别: 引出线对齐黑走线+连接点)            │
 │        └──────── 经 sch_components.json 数据库 ──────┘       │
 └────────────────────────────────────────────────────────────┘
@@ -64,6 +64,37 @@ pcb_components.json (位置索引) → pcb_package (封装) / pcb_verify (校验
 | `pcb_verify/` | 坐标锚点验证 (OCR 误读/DPI 缩放/母图版本排查) |
 | `schematic_flow_walk/` | 原理图信号流走线: 彩线掩膜+BFS走线+符号检测+OCR关联 → chain_order |
 
+### sch 细分管线工具 (符号识别链, 工具间关系)
+
+sch 侧符号识别拆成 **识别→自我监督校验** 两层 (对应 PCB 侧 pcb_package→pcb_verify),
+经 `sch_components.json` 交互, 每层只依赖前一层产物:
+
+```
+sch_trace → sch_label_ocr → sch_flow_walk (产出 symbol_pos + membership)
+   ↓
+sch_symbol/ (符号本体识别, 消费 flow_through + symbol_pos)
+   ├── sch_symbol.py   统一入口 (按 refdes 前缀分派)
+   ├── common.py       辅助第一轮粗筛候选 (圆/方块/线/板线, 宁多勿漏)
+   └── sch_{cap,res,ind,ic,transistor,diode,varactor}.py  利用现存信息精识别
+   ↓
+sch_symbol_selfcheck/ (自我监督校验, 消费 symbol_body)
+   ├── sch_symbol_selfcheck.py  边界包含/on-label + --correct 校准 + 尺寸知识累积
+   ├── check_reverse_ocr.py     反向 OCR 反查关联
+   └── check_overlap.py         符号重叠反查
+   ↓
+sch_wire/ (走线↔符号互验) → sch_render (渲染) → chain_order_rx.json
+```
+
+| 工具 | 消费 | 产出 | 关系 |
+|---|---|---|---|
+| `sch_trace/` | 原理图 PNG (绿线) | `symbols` 候选 (触点绿线) | 层1a 识别: 沿绿线走线+符号探测 |
+| `sch_label_ocr/` | symbols 候选 | `components` (refdes 关联) | 层1b 识别: 读标号 (schema §3.5) |
+| `sch_verify/` (sch_flow_walk) | components | `membership` + chain_order | 层2 鉴别: 绿线流 membership |
+| `sch_symbol/` | flow_through + symbol_pos | symbol_body / symbol_type / orientation | 识别层, 对应 pcb_package |
+| `sch_symbol_selfcheck/` | symbol_body | sym_verify / 修正后 symbol_pos / 尺寸知识 | **自我监督层**, 校验+校准+学习, 对应 pcb_verify; 内置反向OCR/边界/重叠/尺寸算法, 属 architecture §14 进化闭环 |
+| `sch_wire/` | 纯黑图层 | 走线骨架 / 连接圆点 | 走线↔符号互验, 引出线对齐 |
+| `sch_render/` | sch_components.json | roundXXX.png | 渲染层, 供人工检查 |
+
 ## 典型操作
 
 ```bash
@@ -110,6 +141,11 @@ python3 tools/signal_flow_route/signal_flow_route.py \
 - 渲染: svg_render (PNG+SVG, via/IC轮廓/箭头)
 - 坐标转换修复: 旋转 OCR 逆变换 (rot=90/270 不再偏移)
 - 元器件索引 pcb_components.json: 跨视图坐标枢纽 + 封装字段
+- **sch_symbol_verify 改名 sch_symbol_selfcheck (2026-09-17)**: 该层不只是"被动验证",
+  内置自我监督算法 (反向OCR/符号边界包含/on-label/重叠检测) + 尺寸知识自学习
+  (schema §3.6 append 累积) + --correct 自我校准。属 architecture §14 无监督进化闭环,
+  目录 `tools/sch_symbol_selfcheck/` (check_reverse_ocr.py / check_overlap.py /
+  sch_symbol_selfcheck.py)。
 
 ### 下一步
 - bot 视图圆形裁切 pcb_label_ocr 全量跑 (已有 --limit 测试)

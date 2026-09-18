@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""tools/sch_symbol_verify/check_reverse_ocr.py — 反向 OCR 反查
+"""tools/sch_symbol_selfcheck/check_reverse_ocr.py — 反向 OCR 反查
 
 purpose: 在符号中心反向 OCR, 确认读出的 refdes 与关联一致.
         若不一致 → 关联错误 (红点在别的符号/label 上).
@@ -8,7 +8,7 @@ purpose: 在符号中心反向 OCR, 确认读出的 refdes 与关联一致.
   python3 check_reverse_ocr.py --img sch.png --db sch_components.json \
       [--radius 45] [--rots 0,90,180,270]
 
-与 sch_symbol_verify.py (主边界) / check_overlap.py (重叠) 同目录, 独立反查手段.
+与 sch_symbol_selfcheck.py (主边界) / check_overlap.py (重叠) 同目录, 独立反查手段.
 """
 
 import argparse

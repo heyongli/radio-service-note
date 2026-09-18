@@ -83,7 +83,7 @@ def main():
             cv2.circle(overlay, tuple(tp), 12, color, 2)
             cv2.putText(overlay, str(c.get("refdes", "")), (tp[0] - 20, tp[1] - 25),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-        # 符号边界 (sch_symbol_verify 检测): 圆/方块
+        # 符号边界 (sch_symbol_selfcheck 检测): 圆/方块
         bd = c.get("sym_boundary")
         if bd:
             if bd.get("kind") == "circle":
@@ -141,8 +141,11 @@ def main():
     cv2.imwrite(args.out, overlay)
     print(f"[sch_render] saved: {args.out} (legend at quadrant {best_q[0]},{best_q[1]})")
 
-    # 用学习到的电容掩膜做高亮图层 (不覆盖原电路, 叠加高亮描边)
+    # 用学习到的电容掩膜做高亮图层 (引出线对齐 sch_wire 走线)
     if args.redraw_caps:
+        # 纯黑图层 (走线)
+        pb = ((cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) < 150) & 
+              ~((img[:,:,2] > 120) & (img[:,:,0] < 110) & (img[:,:,1] < 110))).astype(np.uint8)
         for c in db["components"]:
             if c.get("membership") != "flow_through" or not c.get("refdes"):
                 continue
@@ -153,14 +156,27 @@ def main():
             gap = b.get("gap", 18)
             ln = b.get("len", 45)
             hw = 3
-            col = (0, 0, 200)  # 高亮蓝 (叠加, 原电路可见)
+            col = (0, 0, 200)
             x1 = cx - ln // 2
             x2 = cx + ln // 2
+            # 引出线对齐 sch_wire: 找电容两侧的水平走线 (y 轴)
+            wy = cy
+            H, W = pb.shape
+            for dy in range(0, 20):
+                if 0 <= cy + dy < H and pb[cy + dy, max(0, x1 - 30):x2 + 30].sum() > 15:
+                    wy = cy + dy
+                    break
+                if 0 <= cy - dy < H and pb[cy - dy, max(0, x1 - 30):x2 + 30].sum() > 15:
+                    wy = cy - dy
+                    break
             cv2.line(overlay, (x1, cy - gap // 2), (x1, cy + gap // 2), col, hw)
             cv2.line(overlay, (x2, cy - gap // 2), (x2, cy + gap // 2), col, hw)
-            cv2.line(overlay, (x1 - 25, cy), (x1, cy), col, hw)
-            cv2.line(overlay, (x2, cy), (x2 + 25, cy), col, hw)
-        print(f"[sch_render] caps highlighted (overlay, original preserved)")
+            # 引出线: 从板线延伸到走线 (贴合 wy), 沿走线方向
+            cv2.line(overlay, (x1, wy), (x1, cy), col, hw)
+            cv2.line(overlay, (x2, wy), (x2, cy), col, hw)
+            cv2.line(overlay, (max(0, x1 - 40), wy), (x1, wy), col, hw)
+            cv2.line(overlay, (x2, wy), (min(W - 1, x2 + 40), wy), col, hw)
+        print(f"[sch_render] caps highlighted, leads aligned to sch_wire")
 
     # 最后一步: 裁剪大片空白边
     if args.crop:

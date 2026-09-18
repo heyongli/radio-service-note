@@ -9,7 +9,7 @@
 """
 import argparse, sys
 import cv2
-from common import find_circles, load_db, save_db
+from common import find_circles, load_db, save_db, boundary_from_body
 
 
 def detect(gray, x, y, radius=80):
@@ -38,6 +38,7 @@ def main():
             b = detect(gray, c["symbol_pos"][0], c["symbol_pos"][1], args.radius)
             c["symbol_type"] = "circle"
             c["symbol_body"] = b
+            c["sym_boundary"] = boundary_from_body(b)
             if b:
                 n += 1
     save_db(db, args.db)

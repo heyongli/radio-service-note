@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""tools/sch_symbol_verify/sch_symbol_verify.py — 符号验证 (纯验证)
+"""tools/sch_symbol_selfcheck/sch_symbol_selfcheck.py — 符号自我监督校验
 
 purpose: 消费 sch_symbol (符号识别) 的 symbol_body + sch_components.json,
-        验证红点 (symbol_pos) 是否在符号本体上:
+        内置自我监督算法自证识别是否准确:
           - circle/rect 本体须包含红点
           - cap/line 本体中心 = 符号位置 (修正 symbol_pos)
           - 红点不得落在 label 文字框内
-        识别在 sch_symbol, 本程序只验证 (对应 PCB: sch_symbol=pcb_package,
-        sch_symbol_verify=pcb_verify).
+          - 尺寸知识自学习 (验证 OK 尺寸 append 知识库, 中位=典型, 反哺校验)
+        识别在 sch_symbol, 本程序自我校验 + 自我校准 + 自我学习
+        (对应 PCB: sch_symbol=pcb_package, sch_symbol_selfcheck=pcb_verify).
 
 用法:
-  python3 sch_symbol_verify.py --img sch.png --db sch_components.json
+  python3 sch_symbol_selfcheck.py --img sch.png --db sch_components.json
 """
 
 import argparse
@@ -111,7 +112,7 @@ def main():
         json.dump(db, f, indent=2, ensure_ascii=False)
     import os
     os.replace(tmp, args.db)
-    print(f"[sch_symbol_verify] ok={n_ok}/{n} corrected={n_corrected} "
+    print(f"[sch_symbol_selfcheck] ok={n_ok}/{n} corrected={n_corrected} "
           f"on_label={n_onlabel} size_dev={n_sizedev}")
 
 

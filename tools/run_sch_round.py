@@ -73,7 +73,7 @@ def main():
     print(f"=== Round {rn}: sch 符号识别+验证 (sch 管线之后) ===")
     for tool in ["sch_transistor", "sch_ic", "sch_cap", "sch_res", "sch_ind", "sch_diode", "sch_varactor"]:
         run([sys.executable, f"tools/sch_symbol/{tool}.py", "--img", IMG, "--db", args.db])
-    run([sys.executable, "tools/sch_symbol_verify/sch_symbol_verify.py",
+    run([sys.executable, "tools/sch_symbol_selfcheck/sch_symbol_selfcheck.py",
          "--img", IMG, "--db", args.db, "--correct"])
 
     # 符号尺寸知识库同步到项目 nettable (数据入 project, 不断累积)

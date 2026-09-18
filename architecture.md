@@ -502,6 +502,7 @@ rot=270: ox = Wc - 1 - ry, oy = rx            (Wc = 原始 crop 宽度)
 **分层管线** (各程序独立发展, 经 `sch_components.json` 数据库交互, schema §3.5):
 ```
 sch_trace(沿绿线走线+符号) → sch_label_ocr(读标号) → sch_flow_walk(绿线流鉴别)
+   → sch_symbol(符号本体识别) → sch_symbol_selfcheck(自我监督校验)
    → sch_render(渲染)     → chain_order (有序链)
 ```
 
@@ -510,6 +511,8 @@ sch_trace(沿绿线走线+符号) → sch_label_ocr(读标号) → sch_flow_walk
 | `sch_trace.py` | `tools/sch_trace/` | 沿绿线 BFS 走线, 局部探测符号 (电容/三极管/IC), 只识别绿线上的 |
 | `sch_label_ocr.py` | `tools/sch_label_ocr/` | 读绿线符号旁的标号 (OCR 关联) |
 | `sch_flow_walk.py` | `tools/sch_verify/` | 绿线流鉴别: membership (flow_through 主路/branch 支路/none) |
+| `sch_symbol/` | `tools/sch_symbol/` | **符号本体识别** (识别层): 按类型识别本体 (对应 pcb_package) |
+| `sch_symbol_selfcheck/` | `tools/sch_symbol_selfcheck/` | **自我监督校验** (校验层): 边界/反向OCR/重叠 + 尺寸知识累积 (对应 pcb_verify) |
 | `sch_render.py` | `tools/sch_render/` | 渲染识别+鉴别结果到原理图 |
 | `sch_wire/` | `tools/sch_wire/` | **走线识别**: 黑走线骨架+连接圆点 (引出线对齐走线) |
 
@@ -541,6 +544,8 @@ PCB 标注全自动闭环。
 | **符号重叠检测** | 电路图符号不能重叠 | 重叠 = 误关联, 触发去重 |
 | **refdes 去重** | 同一 refdes 只能一个符号 (符号不重叠) | 保留验证 OK 的 |
 | **终端定位** | 2 端器件 (C/R/L) 黑线断口=端点, 中心=断口中点 | 位置自证 |
+| **走线↔符号互验** | 走线必终结于符号, 符号必有走线 (双向约束) | 走线端点应落符号/连接点 |
+| **合成掩膜探索** | 学习掩膜 (典型尺寸合成) 与图中元素对齐匹配 | 高分对齐处 = 真实符号 (强无监督验证) |
 
 ### 14.2 自我学习积累 (知识随确认增长)
 | 知识 | 存储 | 机制 |
@@ -566,5 +571,31 @@ PCB 标注全自动闭环。
 - 程序含宽容忍 → 需人工抽查 (round013 红点在符号内但仍有缺陷)
 - 校验手段逐步叠加 (反向OCR → label框 → 边界 → 重叠 → 尺寸 → 掩膜),
   每层减少一类错误
-- 识别(符号本体)与验证(位置)分层: sch_symbol (对应 pcb_package) /
-  sch_symbol_verify (对应 pcb_verify)
+- 识别(符号本体)与自我监督校验(位置/关联)分层: sch_symbol (对应 pcb_package) /
+  sch_symbol_selfcheck (对应 pcb_verify)
+
+### 14.5 多轮滚动迭代 (round 机制, 2026-09-17 沉淀)
+
+**核心**: 识别不是一次性的, 而是**多轮滚动** (roundXXX)。第一轮往往只能
+定位到**关键信息** (粗位置/粗略候选), 随管线**反复运行**, 数据逐步
+**更精确、更丰富** —— 每一轮消费前一轮的产物 + 校验结果 + 累积知识, 反哺下一轮。
+
+**滚动机制**:
+```
+round N 输出 (粗) ──校验──> 确认/纠正 ──> 知识入库 (append) ──> 反哺
+                                                                    │
+    round N+1 输入 (知识+前一轮数据) ◄────────────────────────────┘
+```
+
+**示例 (已实测)**:
+- `sch_symbol_sizes.json` 尺寸知识库 append 累积: 一次 round028 运行
+  cap 41→76 条 / circle 10→48 / ic 1→24 (确认 OK 的尺寸不断入库)
+- `symbol_body` / `sym_boundary`: 随识别器迭代从"无"到"有", 并随模板/掩膜
+  refine 位置精确化 (mask_loc / calib / real_loc 逐层矫正)
+
+**待统计 (todo)**: 目前还没有系统统计"哪些数据是随轮次滚动的、各自滚动了
+多少、收敛还是发散"。后续应:
+1. 列出所有**滚动数据** (sizes db / symbol_body / sym_boundary / chain_order /
+   components_index / waypoints 等) 及它们的生产者/消费者/累积方向
+2. 记录轮次间的 delta (每轮新增/修正/删除), 评估是否收敛
+3. 对发散 (越滚越乱) 的数据要加闸 (如尺寸偏离典型 ±60% 标 size_dev)

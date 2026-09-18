@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""tools/sch_symbol_verify/check_overlap.py — 符号重叠反查
+"""tools/sch_symbol_selfcheck/check_overlap.py — 符号重叠反查
 
 purpose: 电路图符号不能重叠。检测两个 flow_through 符号边界是否重叠,
         重叠即识别错误 (误关联到同一符号/邻近符号).
@@ -8,7 +8,7 @@ purpose: 电路图符号不能重叠。检测两个 flow_through 符号边界是
 用法:
   python3 check_overlap.py --db sch_components.json [--pad 6] [--out 重叠报告]
 
-与 sch_symbol_verify.py (主边界验证) / check_reverse_ocr.py (反向OCR) 同目录,
+与 sch_symbol_selfcheck.py (主边界验证) / check_reverse_ocr.py (反向OCR) 同目录,
 各自独立, 都是符号反查手段.
 """
 

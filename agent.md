@@ -4,6 +4,11 @@
 * git 提交纪律 : 永远不要 `git add -f`, 尊重 .gitignore 规则, projects/ 等目录不进 git。
 * 未确认的坐标要记录并在渲染时忽略 不得臆造坐标
 * 修改任何工具/程序前, 必须先完整阅读其 `readme.md`; 改动不得破坏 readme 中固化的原则并保持重要算法
+* 要阅读 archtecure.md 相关章节， 和对应工具的readme
+* 保持readme和代码的tracking关系
+* 保持schema.md 对数据格式追踪关系
+* 保持tools/readme 包含对管线设计的追踪关系
+* 保持archtecure对架构的设计追踪关系
 
 
 ## 项目介绍

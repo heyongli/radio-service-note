@@ -213,6 +213,41 @@ def body_size(body):
     return None
 
 
+def boundary_from_body(body):
+    """从 symbol_body 生成符号的最小包含 (rect/circle, 归一化).
+
+    sym_boundary = 符号本体识别后的最小包含形状 (方块或圆):
+      - circle → circle (最小外接圆 = 本体圆)
+      - rect   → rect (本体框)
+      - cap    → rect (双板线外接框, len=板长方向, gap=板间距)
+      - line   → rect (断口小方框, 中心即符号)
+      - diode  → rect (三角外接框)
+    供 check_overlap (重叠) 与 sch_render (边界绘制) 消费.
+    """
+    if body is None:
+        return None
+    kind = body.get("kind")
+    if kind == "circle":
+        return {"kind": "circle", "cx": body["cx"], "cy": body["cy"], "r": body["r"]}
+    if kind == "rect":
+        return {"kind": "rect", "x": body["x"], "y": body["y"],
+                "w": body["w"], "h": body["h"]}
+    if kind == "cap":
+        ln = max(6, body.get("len", 18))
+        gp = max(4, body.get("gap", 12))
+        return {"kind": "rect", "x": body["cx"] - ln // 2, "y": body["cy"] - gp // 2,
+                "w": ln, "h": gp}
+    if kind == "line":
+        return {"kind": "rect", "x": body["cx"] - 10, "y": body["cy"] - 10,
+                "w": 20, "h": 20}
+    if kind == "diode":
+        w = max(8, body.get("w", 0))
+        h = max(8, body.get("h", 0))
+        return {"kind": "rect", "x": body["cx"] - w // 2, "y": body["cy"] - h // 2,
+                "w": w, "h": h}
+    return None
+
+
 def update_sizes_db(sizes_path, sym, size, refdes=None):
     """记录一个已确认符号的尺寸到知识库. sizes_path 持久化 JSON."""
     import json, os

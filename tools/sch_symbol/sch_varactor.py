@@ -10,7 +10,7 @@
 import argparse, sys
 import cv2
 import numpy as np
-from common import load_db, save_db
+from common import load_db, save_db, boundary_from_body
 from sch_diode import _triangle
 
 
@@ -69,6 +69,7 @@ def main():
             b = detect(gray, c["symbol_pos"][0], c["symbol_pos"][1], args.radius)
             c["symbol_type"] = "varactor"
             c["symbol_body"] = b
+            c["sym_boundary"] = boundary_from_body(b)
             if b:
                 n += 1
     save_db(db, args.db)

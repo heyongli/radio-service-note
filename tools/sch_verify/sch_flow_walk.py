@@ -185,7 +185,7 @@ def reverse_ocr_verify(gray, ocr, components, sym_list=None, radius=50, correct=
     """反向 OCR 验证符号中心 (只验 flow_through), 报告准确率.
 
     主验证 = 定位 label 文字框: symbol_pos 落在框内 = on_label (红点在文字上);
-    在框外 = OK. 1 次 OCR/组件. 符号边界验证见 sch_symbol_verify (独立程序).
+    在框外 = OK. 1 次 OCR/组件. 符号边界验证见 sch_symbol_selfcheck (独立程序).
     """
     n_ok = n_total = n_corrected = n_onlabel = 0
     for c in components:
