@@ -237,7 +237,8 @@ OCR 数据库里识别出说明框标题类的文字作锚点.
 
 ### 输出模式: color layer (颜色图层, 2026-09-18 定稿)
 
-**三 stage 管线** (工具 `color_layer.py`, 用 legend 准确色):
+**四 stage 管线** (工具 `color_layer.py`, 用 legend 准确色; 自监督线宽=legend
+色样本条带厚度, 实测 16px):
 
 ```
 stage1 图层:       白底 + 非目标内容调淡(--fade 0.45) + 目标信号色高亮
@@ -246,10 +247,15 @@ stage2 去灰纯区域:  --pure → 白底+纯目标色 (饱和度阈值 --sat-m
                     → <signal>_line_region.png
 stage3 填实:        --heal → 直接 legend 色掩膜纯填实 (3over2样式)
                     → <signal>_healed.png   (--border 加1px框 / --continu 方向闭接续)
+stage4 走向探测:    --direction → 在图层(目标色掩膜)上运算, 分类各段:
+                    L形直角拐弯(蓝框) / 真斜线10-80°(红框) / 直段(红箭头标走向)
+                    走向 = 远离上游(chain前部) → 下游 (链序 chain_order_rx.json)
 ```
 
-**自监督线宽** (legend 色样本条带厚度测量, `legend_line_width`): stage3 合并核
-默认 = 参考线宽 (实测 16px). 线宽学习剔除"突然最大值" (胖体/元器件).
+**stage-4 段分类** (用户: "倾斜的多是直角拐弯"):
+- **L 形拐弯** (两端点方向垂直 60-120°) — 实为横+竖拐角, 非真斜线 (58个)
+- **真斜线** (10-80°) — 真对角段 (13个)
+- **直段** (横/竖) — 画走向箭头 (115个)
 
 命令:
 ```bash
@@ -259,7 +265,12 @@ python3 tools/sch-true-finding/color_layer.py --img sch-600.png \
   --legend explanatory_notes.json --signals RX --pure --out rx_line_region.png
 python3 tools/sch-true-finding/color_layer.py --img sch-600.png \
   --legend explanatory_notes.json --signals RX --heal --out rx_healed.png
+python3 tools/sch-true-finding/color_layer.py --img sch-600.png \
+  --legend explanatory_notes.json --signals RX --heal --direction --out rx_s4_direction.png
 ```
+
+**自监督线宽**: stage3/4 合并核与判据默认 = 参考线宽 (legend 色样本条带厚度).
+线宽学习剔除"突然最大值" (胖体/元器件). 缝隙 ≤ 线宽 = 同一条线 (填), > 线宽 = 不同线.
 
 **不同机型**: 锚点文字可能不同 (Explanatory/LEGEND/注...), 工作流不变, 只需在
 OCR 数据库里识别出说明框标题类的文字作锚点.
