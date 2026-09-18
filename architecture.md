@@ -778,3 +778,16 @@ round N 输出 (粗) ──校验──> 确认/纠正 ──> 知识入库 (app
    components_index / waypoints 等) 及它们的生产者/消费者/累积方向
 2. 记录轮次间的 delta (每轮新增/修正/删除), 评估是否收敛
 3. 对发散 (越滚越乱) 的数据要加闸 (如尺寸偏离典型 ±60% 标 size_dev)
+
+---
+
+## 15. 术语/词汇表 (2026-09-18)
+
+| 术语 | 含义 |
+|---|---|
+| **color layer (颜色图层)** | 用**图例准确色** (explanatory_notes.json) 输出的图层: 白底 + 灰色原理图 + 指定信号色高亮 (如 rx_color_layer = 全图灰, RX绿线彩色). **重要视觉结果**: 一眼看出该信号的标注位置. 工具 `color_layer.py`. 输出命名 `<signal>_color_layer.png` (可组合, 如 RX+COMMON) |
+| de-annotation | 去除信号流标注线, 得"标注从未存在"底图. 工具 de_annotate_* (lumfrac/chandiff/chmask) |
+| wirelum | 亮度保走线检测: 标注内亮度最低的暗芯=被彩线覆盖的走线. 工具 wire_lum_detect.py |
+| legend 图例数据库 | 说明框提取的 颜色→信号 权威真值 (explanatory_notes.json), 校准 COLOR_SPEC/图层用 |
+| 段内暗芯 (lumfrac) | 每彩色段保留亮度最低比例=走线芯, 不断线不变细 |
+| ROI 局部化 | 先识别标注区域, 算法只在其 bbox×scale 内应用, 避免全局参数顾此失彼 |

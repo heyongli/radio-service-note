@@ -5,6 +5,9 @@
 |---|---|
 | `sch_true_greenline.py` | 绿线真理发现: 彩线掩膜 (绿/红/黄/青) + 统计 |
 | `note_box_locate.py` | **定位原理图说明框 (虚线方块) + 图例**: OCR找锚点文字→定位→检测dash虚线框→反查OCR取框内图例文字 |
+| `legend_extract.py` | 从说明框提取**图例数据库** (文字↔色样本, 颜色→信号权威真值) |
+| `legend_region_detect.py` | **用 legend 准确 RGB 识别全部标注区域** (RX/TX/common/POWER): RGB容差掩膜→连通域→红色细线边框圈出 |
+| `color_layer.py` | **信号颜色图层** (rx/tx color layer): 白底+灰原理图+目标信号色高亮, 一眼看信号位置 (重要视觉结果) |
 | `annotation_detect.py` | 标注区域识别 (彩色连通域→bbox/区域掩膜, 供 ROI 局部化) |
 | `de_annotate_lumfrac.py` | **信号流标注去除 (固化版, 用户裁定最终答案 2026-09-17)**: 段内暗芯法, 不断线不变细. 方法简称=lumfrac |
 | `de_annotate_chandiff.py` | 标注去除 (chandiff 版, 曾为最终; 会断线/变细) |
@@ -231,6 +234,24 @@ agent 每轮改算法后跑指标自判, 不依赖人工看图. 指标与实测�
 
 **不同机型**: 锚点文字可能不同 (Explanatory/LEGEND/注...), 工作流不变, 只需在
 OCR 数据库里识别出说明框标题类的文字作锚点.
+
+### 输出模式: color layer (颜色图层, 2026-09-18 定稿)
+
+**图层输出模式** (用户裁定): 白底 + **灰色原理图** + **目标信号色高亮**.
+"只有目标信号是彩色, 其他是灰色" —— 一眼看出该信号标注位置. 重要视觉结果.
+
+```
+rx_color_layer.png  = 灰原理图 + RX(绿) + common(青) 彩色
+tx_color_layer.png  = 灰原理图 + TX(土黄) + common(青) 彩色
+```
+
+命令:
+```bash
+python3 tools/sch-true-finding/color_layer.py --img sch-600.png \
+  --legend explanatory_notes.json --signals RX,COMMON --out rx_color_layer.png
+```
+
+工具: `color_layer.py` (通用, --signals 可组合; 输出命名 `<signal>_color_layer.png`).
 
 **命令**:
 ```bash

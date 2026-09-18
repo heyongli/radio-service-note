@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""tools/sch-true-finding/de_annotate_wirelum.py — 信号流标注去除 (亮度保走线法)
+"""tools/sch-true-finding/wire_lum_detect.py — wirelum 走线检测 (亮度保走线法)
 
-purpose: 从原理图中去除信号流标注线, **按亮度保走线** (用户洞察: 绿标注与
-        走线色调融合, 按亮度更暗判走线). 处理三色: 绿=RX / 青=common /
-        土黄=TX. **方法简称 = wirelum (wire luminance)**.
+purpose: 用**亮度保走线**检测信号走线: 标注内 亮度最低的暗芯 = 被彩线覆盖的
+        走线 (绿标注与走线色调融合, 按亮度更暗判走线). 处理 RX(绿)/TX(土黄)/
+        common(青)/voltage(品红) 四色. **方法 = wirelum (wire luminance)**.
+        注意: 本工具检测走线 (非 de-annotate); 输出保留走线芯.
 format: Python 3 + OpenCV
 version: 1.0 (2026-09-18)
 
@@ -20,13 +21,14 @@ version: 1.0 (2026-09-18)
   品红 (可选) h150-180 164k px BGR(128,52,181)
 
 用法:
-  python3 de_annotate_wirelum.py --img sch.png --out deannot.png
+  python3 wire_lum_detect.py --img sch.png --out deannot.png
     [--wire-lum 120] [--keep-color]
 
 消费方: sch_wirenet (去标注后 net 网表), 原理图纯净底图.
 """
 
 import argparse
+import json
 import sys
 
 import cv2
@@ -73,18 +75,40 @@ def wire_fill_color(img, dark_th=150):
     return np.array([30, 30, 30], np.uint8)
 
 
+def legend_luminance(legend_json, signals):
+    """读图例数据库, 取各信号的色样本亮度 (权威阈值). 返回 {signal: lum}."""
+    with open(legend_json) as f:
+        d = json.load(f)
+    out = {}
+    for e in d.get("entries", []):
+        if not (e.get("color_bgr") and e.get("label")):
+            continue
+        c = e["color_bgr"]
+        lum = 0.299 * c[2] + 0.587 * c[1] + 0.114 * c[0]   # BGR→亮度
+        for sig in signals:
+            if sig in e["label"].upper():
+                out[sig] = lum
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--img", required=True, help="原理图渲染图")
     ap.add_argument("--out", required=True, help="输出去标注底图")
+    ap.add_argument("--legend", default=None,
+                    help="图例数据库 explanatory_notes.json; 提供时用样本**准确亮度** "
+                         "做每色阈值 (比全局M120/掩膜中位更准)")
     ap.add_argument("--wire-lum", type=int, default=120,
                     help="亮度阈值: 标注内 亮度<此值=走线(保留), >=此值=标注(置白); "
-                         "==0 时每色自适应 (按该色亮度中位, 四色都显示)")
-    ap.add_argument("--keep-color", action="store_true",
-                    help="保留的暗芯用原彩色, 不染走线灰")
-    ap.add_argument("--colors", default="green,cyan,tuHuang,magenta",
-                    help="处理哪些色 (逗号分隔; 可选 green/cyan/tuHuang/magenta)")
-    ap.add_argument("--fill", type=int, default=255, help="填充色 (255=白)")
+                         "==0 时每色自适应 (按该色亮度中位). 默认 120 (M120 全局)")
+    ap.add_argument("--keep-color", action="store_true", default=True,
+                    help="保留的暗芯用原彩色 (默认开)")
+    ap.add_argument("--no-keep-color", dest="keep_color", action="store_false",
+                    help="保留的暗芯染走线灰")
+    ap.add_argument("--colors", default="green,tuHuang,cyan",
+                    help="处理哪些色 (默认 green,tuHuang,cyan = RX/TX/common)")
+    ap.add_argument("--fill", type=int, default=255, help="背景填充色 (255=白)")
+    ap.add_argument("--dark-th", type=int, default=150, help="走线暗阈值")
     args = ap.parse_args()
 
     img = cv2.imread(args.img)
@@ -94,31 +118,45 @@ def main():
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     annot = annotation_mask(img, colors)
-    if args.wire_lum > 0:
+    # 用 legend 样本准确亮度做每色阈值 (优先)
+    lum_map = {}
+    if args.legend:
+        # colors 是 green/tuHuang/cyan → 映射到信号 RX/TX/COMMON
+        sig_map = {"green": "RX", "tuHuang": "TX", "cyan": "COMMON", "magenta": "VOLTAGE"}
+        lum_map = legend_luminance(args.legend, list(sig_map.values()))
+    if args.wire_lum > 0 and not lum_map:
         keep = (annot > 0) & (gray < args.wire_lum)
     else:
-        # 每色自适应: 按该色亮度中位 (保留暗芯), 四色都显示
+        # 每色: 优先用 legend 亮度, 否则该色亮度中位
         keep = np.zeros_like(annot, bool)
         for c in colors:
             m = color_mask(img, COLOR_SPEC[c]) > 0
             if m.sum() == 0:
                 continue
-            th = np.median(gray[m])
+            sig = {"green": "RX", "tuHuang": "TX", "cyan": "COMMON", "magenta": "VOLTAGE"}[c]
+            th = lum_map.get(sig)
+            if th is None:
+                th = np.median(gray[m])          # 无 legend: 该色亮度中位
             keep |= m & (gray < th)
     remask = (annot > 0) & (~keep)
 
-    out = img.copy()
-    out[remask > 0] = args.fill
+    wc = wire_fill_color(img)
+    # wirelum DETECT 输出 = 走线检测图 (非 de-annotate):
+    #   白底 + 原灰走线 + 检测到的信号走线芯 (保色或染走线灰)
+    dark = gray < args.dark_th
+    wire_px = (dark > 0) & (annot == 0)       # 原灰走线 (未标注覆盖)
+    out = np.full_like(img, args.fill)
+    out[wire_px] = img[wire_px]
     if args.keep_color:
         out[keep] = img[keep]
     else:
-        out[keep] = wire_fill_color(img)
+        out[keep] = wc
     cv2.imwrite(args.out, out)
 
     b, g, r = cv2.split(out.astype(int))
     md = np.maximum.reduce([np.abs(g - r), np.abs(g - b), np.abs(r - b)])
     resid = int((md > 40).sum())
-    print(f"[de-annotate:wirelum] colors={args.colors} wire_lum={args.wire_lum} "
+    print(f"[wire_lum_detect] colors={args.colors} wire_lum={args.wire_lum} "
           f"keep={int(keep.sum())} px, colored_resid={resid}, saved {args.out}")
 
 
